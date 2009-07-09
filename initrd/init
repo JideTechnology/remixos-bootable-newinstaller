@@ -1,0 +1,80 @@
+#!/bin/busybox sh
+
+if [ -n "$DEBUG" ]; then
+	LOG=/tmp/log
+	set -x
+else
+	LOG=/dev/null
+	[ -e $LOG ] || busybox mknod $LOG c 1 3
+fi
+exec 2> $LOG
+
+busybox mount -t proc proc /proc
+busybox mount -t sysfs sys /sys
+
+busybox --install -s
+
+export PATH=$PATH:/system/bin
+
+if [ -n "$DEBUG" ]; then
+	mknod /dev/tty2 c 4 2 && openvt
+	mknod /dev/tty3 c 4 3 && openvt
+fi
+
+echo -n Detecting Android...
+
+while [ 1 ]; do
+	mdev -s
+
+	for device in /dev/sr* /dev/sd[a-z]*; do
+		mount $device /mnt || continue
+		cd /mnt/$SRC
+		if [ ! -e ramdisk.img -o ! -e system.img ]; then
+			umount /mnt
+			continue
+		fi
+		mount -t tmpfs tmpfs /android
+		cd /android
+		zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
+		mount -o loop,ro /mnt/$SRC/system.img system
+		mkdir cache sdcard
+		mount -t tmpfs tmpfs data
+		mount -t tmpfs tmpfs cache
+		mount -t tmpfs tmpfs sdcard
+		echo " found at $device"
+		break
+	done
+	mountpoint -q /android && break
+	sleep 1
+	echo -n .
+done
+
+ln -s android/system /
+
+ln -s ../system/lib/modules /lib
+
+# load framebuffer driver
+if [ ! -e /dev/fb0 ]; then
+	modprobe drm
+	# TODO: auto detect and load correct driver
+	modprobe i915
+fi
+
+# load lan driver
+# TODO
+# load wifi driver
+# TODO
+
+if [ -n "$DEBUG" ]; then
+	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
+	echo -e "Type 'exit' to enter Android...\n"
+
+
+	# FIXME: all error messages in the shell are sent to $LOG
+	sh
+	chroot /android /init
+else
+	exec switch_root /android /init
+fi
+
+sh # aviod kernel panic
