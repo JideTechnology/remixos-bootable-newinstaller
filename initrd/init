@@ -36,7 +36,12 @@ while [ 1 ]; do
 		mount -t tmpfs tmpfs /android
 		cd /android
 		zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
-		mount -o loop,ro /mnt/$SRC/system.img system
+		mount -o loop,ro /mnt/$SRC/system.img /sfs
+		if [ -e /sfs/system.img ]; then
+			mount -o loop,ro /sfs/system.img system
+		else
+			mount --move /sfs system
+		fi
 		mkdir cache sdcard
 		mount -t tmpfs tmpfs data
 		mount -t tmpfs tmpfs cache

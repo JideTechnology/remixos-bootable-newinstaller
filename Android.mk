@@ -2,10 +2,14 @@ ifeq ($(TARGET_ARCH),x86)
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
-#LIVECD_PATH := $(LOCAL_PATH)
-
 LOCAL_MODULE := newinstaller
 LOCAL_MODULE_TAGS := system_builder
+
+define build-squashfs-target
+	$(if $(shell $(MKSQUASHFS) -version | grep "version [0-3].[0-9]"),\
+		$(error Your mksquashfs is too old to work with kernel 2.6.29. Please upgrade to squashfs-tools 4.0))
+	$(hide) $(MKSQUASHFS) $(1) $(2) -noappend
+endef
 
 initrd_dir := $(LOCAL_PATH)/initrd
 initrd_bin := \
@@ -17,7 +21,7 @@ $(installer_ramdisk): $(initrd_bin) | $(ACP)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
-	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys sbin tmp)
+	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys sbin tmp sfs)
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
 
 boot_dir := $(LOCAL_PATH)/boot
@@ -36,5 +40,10 @@ $(ISO_IMAGE): $(BUILT_IMG) $(boot_bin)
 
 .PHONY: iso_img
 iso_img: $(ISO_IMAGE)
+
+# use squashfs for iso, unless explictly disabled
+ifneq ($(USE_SQUASHFS),0)
+iso_img: MKSQUASHFS = $(shell which mksquashfs)
+endif
 
 endif
