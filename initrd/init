@@ -43,37 +43,52 @@ while [ 1 ]; do
 			mount --move /sfs system
 		fi
 		mkdir cache sdcard
-		mount -t tmpfs tmpfs data
 		mount -t tmpfs tmpfs cache
-		mount -t tmpfs tmpfs sdcard
 		echo " found at $device"
 		break
 	done
 	mountpoint -q /android && break
 	sleep 1
 	echo -n .
+	if [ -n "$DEBUG" ]; then
+		echo -e "\nType 'exit' to continue booting...\n"
+		sh
+	fi
 done
 
 ln -s android/system /
 
 ln -s ../system/lib/modules /lib
 
-# load framebuffer driver
-if [ ! -e /dev/fb0 ]; then
-	modprobe drm
-	# TODO: auto detect and load correct driver
-	modprobe i915
+if [ -n "$DATA" ]; then
+	mount $DATA data
+elif [ -d /mnt/$SRC/data ]; then
+	mount --bind /mnt/$SRC/data data
+else
+	mount -t tmpfs tmpfs data
+fi
+if [ -n "$SDCARD" ]; then
+	mount $SDCARD sdcard
+elif [ -d /mnt/$SRC/sdcard ]; then
+	mount --bind /mnt/$SRC/sdcard sdcard
+else
+	mount -t tmpfs tmpfs sdcard
 fi
 
-# load lan driver
-# TODO
-# load wifi driver
-# TODO
+# load scripts
+for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
+	source $s
+done
+
+for m in $ALL_MODULES; do
+	modprobe $m
+done
+
+[ -n "$INSTALL" ] && install_hd
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
 	echo -e "Type 'exit' to enter Android...\n"
-
 
 	# FIXME: all error messages in the shell are sent to $LOG
 	sh

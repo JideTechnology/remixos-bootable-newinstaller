@@ -1,0 +1,4 @@
+install_hd()
+{
+	dialog --title " WARNING " --msgbox '\n  Installation is not implemented yet.\n  Press OK to run live version.' 8 45
+}

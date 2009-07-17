@@ -1,0 +1,66 @@
+# TODO: implement a more generic auto detection by scanning /sys
+# For now we just look up the machine name.
+
+# FBDEV:  framebuffer driver
+# LANDEV: lan driver
+# WIFDEV: wifi driver
+# SNDDEV: sound driver
+# CAMDEV: camera driver
+
+get_asus_info()
+{
+	board=`cat /sys/class/dmi/id/board_name`
+	# assume Eee PC models
+	case "$board" in
+		700|701|900)
+			LANDEV=atl2
+			WIFDEV=ath5k
+			;;
+		701SD|900SD)
+			LANDEV=atl1e
+			WIFDEV=rtl8187se
+			;;
+		900A|904HD)
+			LANDEV=atl1e
+			WIFDEV=ath5k
+			;;
+		*)
+			LANDEV=atl1e
+			WIFDEV=ath9k
+#			WIFDEV=rt2860sta
+			;;
+	esac
+
+	# common for all Eee PC models
+	FBDEV=i915
+	SNDDEV="snd-hda-codec-realtek snd-hda-intel"
+	CAMDEV=uvcvideo
+}
+
+get_vbox_info()
+{
+	LANDEV=pcnet32
+	SNDDEV=snd-intel8x0
+}
+
+get_qemu_info()
+{
+	LANDEV=8139cp
+	SNDDEV=snd-ens1370
+}
+
+check_product()
+{
+	grep -q "$1" /sys/class/dmi/id/uevent
+}
+
+detect_hardware()
+{
+	check_product ASUSTeK && get_asus_info
+	check_product VirtualBox && get_vbox_info
+	check_product QEMU && get_qemu_info
+}
+
+detect_hardware
+
+ALL_MODULES="$FBDEV $LANDEV $WIFDEV $SNDDEV $CAMDEV"
