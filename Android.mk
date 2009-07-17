@@ -17,7 +17,7 @@ initrd_bin := \
 	$(wildcard $(initrd_dir)/*/*)
 
 installer_ramdisk := $(PRODUCT_OUT)/initrd.img
-$(installer_ramdisk): $(initrd_bin) | $(ACP)
+$(installer_ramdisk): $(initrd_bin) | $(ACP) $(MKBOOTFS)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
