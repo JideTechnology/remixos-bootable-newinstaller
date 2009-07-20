@@ -68,19 +68,29 @@ ln -s android/system /
 
 ln -s ../system/lib/modules /lib
 
-if [ -n "$DATA" ]; then
+if [ -b "$DATA" ]; then
 	mount $DATA data
+elif [ -b "/dev/$DATA" ]; then
+	mount /dev/$DATA data
 elif [ -d /mnt/$SRC/data ]; then
 	mount --bind /mnt/$SRC/data data
 else
 	mount -t tmpfs tmpfs data
 fi
-if [ -n "$SDCARD" ]; then
+if [ -b "$SDCARD" ]; then
 	mount $SDCARD sdcard
-elif [ -d /mnt/$SRC/sdcard ]; then
-	mount --bind /mnt/$SRC/sdcard sdcard
+elif [ -b "/dev/$SDCARD" ]; then
+	mount /dev/$SDCARD sdcard
+elif [ -n "$SDCARD" ]; then
+	# TODO: SDCARD is specified but does not exist.
+	# Set it to mountd.conf
+	echo $SDCARD
 else
-	mount -t tmpfs tmpfs sdcard
+	if [ -d /mnt/$SRC/sdcard ]; then
+		mount --bind /mnt/$SRC/sdcard sdcard
+	else
+		mount -t tmpfs tmpfs sdcard
+	fi
 fi
 
 # load scripts
