@@ -1,11 +1,21 @@
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2009/07/18
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
+
 # TODO: implement a more generic auto detection by scanning /sys
 # For now we just look up the machine name.
 
-# FBDEV:  framebuffer driver
+# FB0DEV: framebuffer driver
 # LANDEV: lan driver
 # WIFDEV: wifi driver
 # SNDDEV: sound driver
 # CAMDEV: camera driver
+# PREDEV: any module the drivers depend on but can't be loaded automatically
 
 get_asus_info()
 {
@@ -32,21 +42,28 @@ get_asus_info()
 	esac
 
 	# common for all Eee PC models
-	FBDEV=i915
-	SNDDEV="snd-hda-codec-realtek snd-hda-intel"
+	FB0DEV=i915
+	SNDDEV=snd-hda-intel
 	CAMDEV=uvcvideo
+	PREDEV=snd-hda-codec-realtek
 }
 
 get_vbox_info()
 {
 	LANDEV=pcnet32
-	SNDDEV=snd-intel8x0
+	SNDDEV="snd-sb16 isapnp=0 irq=5"
 }
 
 get_qemu_info()
 {
 	LANDEV=8139cp
 	SNDDEV=snd-ens1370
+}
+
+get_vmware_info()
+{
+	LANDEV=pcnet32
+	SNDDEV=snd-ens1371
 }
 
 check_product()
@@ -59,8 +76,18 @@ detect_hardware()
 	check_product ASUSTeK && get_asus_info
 	check_product VirtualBox && get_vbox_info
 	check_product QEMU && get_qemu_info
+	check_product VMware && get_vmware_info
 }
 
-detect_hardware
-
-ALL_MODULES="$FBDEV $LANDEV $WIFDEV $SNDDEV $CAMDEV"
+load_modules()
+{
+	detect_hardware
+	for m in $PREDEV; do
+		modprobe $m
+	done
+	[ -n "$FB0DEV" ] && modprobe $FB0DEV
+	[ -n "$LANDEV" ] && modprobe $LANDEV
+	[ -n "$WIFDEV" ] && modprobe $WIFDEV
+	[ -n "$SNDDEV" ] && modprobe $SNDDEV
+	[ -n "$CAMDEV" ] && modprobe $CAMDEV
+}

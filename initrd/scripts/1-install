@@ -1,3 +1,12 @@
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2009/07/18
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
+
 install_hd()
 {
 	dialog --title " WARNING " --msgbox '\n  Installation is not implemented yet.\n  Press OK to run live version.' 8 45

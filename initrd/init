@@ -1,4 +1,12 @@
 #!/bin/busybox sh
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2009/07/18
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
 
 if [ -n "$DEBUG" ]; then
 	LOG=/tmp/log
@@ -80,9 +88,7 @@ for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
 	source $s
 done
 
-for m in $ALL_MODULES; do
-	modprobe $m
-done
+load_modules
 
 [ -n "$INSTALL" ] && install_hd
 
