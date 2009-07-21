@@ -37,6 +37,7 @@ get_asus_info()
 		901)
 			LANDEV=atl1e
 			WIFDEV=rt2860sta
+			;;
 		*)
 			LANDEV=atl1e
 			WIFDEV=ath9k
