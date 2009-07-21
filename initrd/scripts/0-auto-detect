@@ -30,10 +30,13 @@ get_asus_info()
 			LANDEV=atl1e
 			WIFDEV=rtl8187se
 			;;
-		900A|904HD)
+		900A|904HD|1000HD)
 			LANDEV=atl1e
 			WIFDEV=ath5k
 			;;
+		901)
+			LANDEV=atl1e
+			WIFDEV=rt2860sta
 		*)
 			LANDEV=atl1e
 			WIFDEV=ath9k
