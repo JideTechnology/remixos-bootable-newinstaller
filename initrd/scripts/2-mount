@@ -1,0 +1,40 @@
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2009/07/21
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
+
+mount_data()
+{
+	if [ -b "$DATA" ]; then
+		mount $DATA data
+	elif [ -b "/dev/$DATA" ]; then
+		mount /dev/$DATA data
+	elif [ -d /mnt/$SRC/data ]; then
+		mount --bind /mnt/$SRC/data data
+	else
+		mount -t tmpfs tmpfs data
+	fi
+}
+
+mount_sdcard()
+{
+	if [ -n "$SDCARD" ]; then
+		[ -b "$SDCARD" ] && SDCARD=`echo $SDCARD | sed "s|/dev/||g"`
+		if [ -b "/dev/$SDCARD" ]; then
+			mount /dev/$SDCARD sdcard
+		else
+			sed -i "s|\(EXTERNAL_STORAGE_STATE\) mounted|\1 unmounted|g" init.rc
+		fi
+		sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/block/$SDCARD|g" mountd.conf
+	else
+		if [ -d /mnt/$SRC/sdcard ]; then
+			mount --bind /mnt/$SRC/sdcard sdcard
+		else
+			mount -t tmpfs tmpfs sdcard
+		fi
+	fi
+}

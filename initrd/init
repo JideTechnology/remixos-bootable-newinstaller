@@ -44,60 +44,8 @@ while [ 1 ]; do
 		mount -t tmpfs tmpfs /android
 		cd /android
 		zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
-		mount -o loop,rw /mnt/$SRC/system.img /sfs
-		if [ -e /sfs/etc/mountd.conf ]; then
-			if [ -n "$SDCARD" ]; then
-				if [ -b $SDCARD ]; then
-					sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1$SDCARD|g" /sfs/etc/mountd.conf
-					sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /sfs/build.prop
-				elif [ -b /dev/$SDCARD ]; then
-					SDCARD=`echo $SDCARD | sed -e 's|^/\(.*\)|\1|g'`
-					sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/$SDCARD|g" /sfs/etc/mountd.conf
-					sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /sfs/build.prop
-				else
-					SDCARD=`echo $SDCARD | sed -e 's|^/\(.*\)|\1|g'`
-					# reset the mount status, mountd will set it when the external storage is added
-					sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=unmounted/g' /sfs/build.prop
-					_sdcard=1
-					sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/$SDCARD|g" /sfs/etc/mountd.conf
-				fi
-			else
-				# clean up the mountd.conf to always mount from tmpfs
-				sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/SDCARD|g" /sfs/etc/mountd.conf
-				sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /sfs/build.prop
-			fi
-		elif [ -e /sfs/build.prop ]; then
-			sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /sfs/build.prop
-		fi
-		umount /sfs
 		mount -o loop,ro /mnt/$SRC/system.img /sfs
 		if [ -e /sfs/system.img ]; then
-			mount -o loop,rw /sfs/system.img system
-			if [ -e system/etc/mountd.conf ]; then
-				if [ -n "$SDCARD" ] ; then
-					if [ -b $SDCARD ]; then
-						sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1$SDCARD|g" /system/etc/mountd.conf
-						sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /system/build.prop
-					elif [ -b /dev/$SDCARD ]; then
-						SDCARD=`echo $SDCARD | sed -e 's|^/\(.*\)|\1|g'`
-						sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/$SDCARD|g" /sfs/etc/mountd.conf
-						sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /system/build.prop
-					else
-						SDCARD=`echo $SDCARD | sed -e 's|^/\(.*\)|\1|g'`
-						# reset the mount status, mountd will set it when the external storage is added
-						sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=unmounted/g' /system/build.prop
-						_sdcard=1
-						sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/$SDCARD|g" /system/etc/mountd.conf
-					fi
-				else
-					# clean up the mountd.conf to always mount from tmpfs
-					sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/SDCARD|g" /system/etc/mountd.conf
-					sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /system/build.prop
-				fi
-			elif [ -e system/build.prop ]; then
-				sed -i 's/^EXTERNAL_STORAGE_STATE=.*$/EXTERNAL_STORAGE_STATE=mounted/g' /system/build.prop
-			fi
-			umount system
 			mount -o loop,ro /sfs/system.img system
 		else
 			mount --move /sfs system
@@ -120,29 +68,6 @@ ln -s android/system /
 
 ln -s ../system/lib/modules /lib
 
-if [ -b "$DATA" ]; then
-	mount $DATA data
-elif [ -b "/dev/$DATA" ]; then
-	mount /dev/$DATA data
-elif [ -d /mnt/$SRC/data ]; then
-	mount --bind /mnt/$SRC/data data
-else
-	mount -t tmpfs tmpfs data
-fi
-if [ -z "$_sdcard"  ]; then
-	if [ -b "$SDCARD" ]; then
-		mount $SDCARD sdcard
-	elif [ -b "/dev/$SDCARD" ]; then
-		mount /dev/$SDCARD sdcard
-	else
-		if [ -d /mnt/$SRC/sdcard ]; then
-			mount --bind /mnt/$SRC/sdcard sdcard
-		else
-			mount -t tmpfs tmpfs sdcard
-		fi
-	fi
-fi
-
 # load scripts
 for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
 	source $s
@@ -151,6 +76,9 @@ done
 load_modules
 
 [ -n "$INSTALL" ] && install_hd
+
+mount_data
+mount_sdcard
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"

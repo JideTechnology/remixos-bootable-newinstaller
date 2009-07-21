@@ -34,19 +34,18 @@ get_asus_info()
 			LANDEV=atl1e
 			WIFDEV=ath5k
 			;;
-		901)
+		901|1000|1000H)
 			LANDEV=atl1e
 			WIFDEV=rt2860sta
 			;;
 		*)
 			LANDEV=atl1e
 			WIFDEV=ath9k
-#			WIFDEV=rt2860sta
 			;;
 	esac
 
 	# common for all Eee PC models
-	FB0DEV=i915
+	[ ! -c /dev/fb0 ] && FB0DEV=i915
 	SNDDEV=snd-hda-intel
 	CAMDEV=uvcvideo
 	PREDEV=snd-hda-codec-realtek
@@ -92,6 +91,6 @@ load_modules()
 	[ -n "$FB0DEV" ] && modprobe $FB0DEV
 	[ -n "$LANDEV" ] && modprobe $LANDEV
 	[ -n "$WIFDEV" ] && modprobe $WIFDEV
-	[ -n "$SNDDEV" ] && modprobe $SNDDEV
+	[ -n "$SNDDEV" ] && modprobe $SNDDEV || modprobe snd-dummy
 	[ -n "$CAMDEV" ] && modprobe $CAMDEV
 }
