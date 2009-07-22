@@ -35,7 +35,7 @@ while [ 1 ]; do
 	mdev -s
 
 	for device in /dev/sr* /dev/sd[a-z]*; do
-		mount $device /mnt || continue
+		mount -o ro $device /mnt || continue
 		cd /mnt/$SRC
 		if [ ! -e ramdisk.img -o ! -e system.img ]; then
 			umount /mnt

@@ -14,6 +14,7 @@ mount_data()
 	elif [ -b "/dev/$DATA" ]; then
 		mount /dev/$DATA data
 	elif [ -d /mnt/$SRC/data ]; then
+		mount -o remount,rw /mnt
 		mount --bind /mnt/$SRC/data data
 	else
 		mount -t tmpfs tmpfs data
@@ -32,6 +33,7 @@ mount_sdcard()
 		sed -i "s|\(^ *block_device *\)\(/dev/.*\)|\1/dev/block/$SDCARD|g" mountd.conf
 	else
 		if [ -d /mnt/$SRC/sdcard ]; then
+			mount -o remount,rw /mnt
 			mount --bind /mnt/$SRC/sdcard sdcard
 		else
 			mount -t tmpfs tmpfs sdcard
