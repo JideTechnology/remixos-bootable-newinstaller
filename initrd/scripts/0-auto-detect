@@ -7,8 +7,17 @@
 # with Android-x86 project.
 #
 
-# TODO: implement a more generic auto detection by scanning /sys
-# For now we just look up the machine name.
+# An auto detect function provided by kinneko
+auto_detect()
+{
+	tmp=/tmp/dev2mod
+	echo 'dev2mod() { while read dev; do case $dev in' > $tmp
+	sort -r /lib/modules/`uname -r`/modules.alias | \
+		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)modprobe \2;;/p' >> $tmp
+	echo 'esac; done; }' >> $tmp
+	source $tmp
+	cat /sys/bus/*/devices/*/modalias | dev2mod
+}
 
 # FB0DEV: framebuffer driver
 # LANDEV: lan driver
@@ -19,7 +28,13 @@
 
 get_asus_info()
 {
-	board=`cat /sys/class/dmi/id/board_name`
+	# common for all Eee PC models
+	[ -c /dev/fb0 ] || FB0DEV=i915
+	PREDEV=snd-hda-codec-realtek
+	SNDDEV=snd-hda-intel
+	CAMDEV=uvcvideo
+
+	board=`cat /sys/class/dmi/id/product_name`
 	# assume Eee PC models
 	case "$board" in
 		700|701|900)
@@ -38,17 +53,23 @@ get_asus_info()
 			LANDEV=atl1e
 			WIFDEV=rt2860sta
 			;;
+		ET1602*)
+			FB0DEV=
+			UVESA_MODE=${UVESA_MODE:-1366x768}
+			LANDEV=r8169
+			WIFDEV=rt2860sta
+			;;
+		T91)
+			FB0DEV=
+			UVESA_MODE=${UVESA_MODE:-1024x600}
+			LANDEV=atl1e
+			WIFDEV=ath9k
+			;;
 		*)
 			LANDEV=atl1e
 			WIFDEV=ath9k
 			;;
 	esac
-
-	# common for all Eee PC models
-	[ ! -c /dev/fb0 ] && FB0DEV=i915
-	SNDDEV=snd-hda-intel
-	CAMDEV=uvcvideo
-	PREDEV=snd-hda-codec-realtek
 }
 
 get_vbox_info()
@@ -76,21 +97,30 @@ check_product()
 
 detect_hardware()
 {
-	check_product ASUSTeK && get_asus_info
-	check_product VirtualBox && get_vbox_info
-	check_product QEMU && get_qemu_info
-	check_product VMware && get_vmware_info
+	check_product ASUSTeK && get_asus_info && return 0
+	check_product Acer.*AO && get_ao_info && return 0
+	check_product VirtualBox && get_vbox_info && return 0
+	check_product QEMU && get_qemu_info && return 0
+	check_product VMware && get_vmware_info && return 0
 }
 
 load_modules()
 {
 	detect_hardware
-	for m in $PREDEV; do
-		modprobe $m
-	done
-	[ -n "$FB0DEV" ] && modprobe $FB0DEV
-	[ -n "$LANDEV" ] && modprobe $LANDEV
-	[ -n "$WIFDEV" ] && modprobe $WIFDEV
-	[ -n "$SNDDEV" ] && modprobe $SNDDEV || modprobe snd-dummy
-	[ -n "$CAMDEV" ] && modprobe $CAMDEV
+	if [ $? -eq 0 ]; then
+		for m in $PREDEV; do
+			modprobe $m
+		done
+		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
+		[ -n "$LANDEV" ] && modprobe $LANDEV
+		[ -n "$WIFDEV" ] && modprobe $WIFDEV
+		[ -n "$SNDDEV" ] && modprobe $SNDDEV
+		[ -n "$CAMDEV" ] && modprobe $CAMDEV
+	else
+		auto_detect
+	fi
+
+	mdev -s
+	[ -d /proc/asound/card0 ] || modprobe snd-dummy
+	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=ywrap}
 }

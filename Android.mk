@@ -21,7 +21,7 @@ $(installer_ramdisk): $(initrd_bin) | $(ACP) $(MKBOOTFS)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
-	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys sbin tmp sfs)
+	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys tmp sfs)
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
 
 boot_dir := $(LOCAL_PATH)/boot
