@@ -58,15 +58,26 @@ while [ 1 ]; do
 	mountpoint -q /android && break
 	sleep 1
 	echo -n .
-	if [ -n "$DEBUG" ]; then
-		echo -e "\nType 'exit' to continue booting...\n"
-		sh
-	fi
 done
 
 ln -s android/system /
 
 ln -s ../system/lib/modules /lib
+
+if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
+	mv /bin /lib /android
+	system/bin/ln -s android/lib /lib
+	system/bin/ln -s android/bin /bin
+	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|;s|\(/system\)\(/bin/sh\)|\2|' init.rc
+	mv /sbin/* /android/sbin
+	rmdir /sbin
+	ln -s android/sbin /
+fi
+
+if [ -n "$DEBUG" ]; then
+	echo -e "\nType 'exit' to continue booting...\n"
+	sh
+fi
 
 # load scripts
 for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
