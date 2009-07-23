@@ -5,11 +5,16 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := newinstaller
 LOCAL_MODULE_TAGS := system_builder
 
+# use squashfs for iso, unless explictly disabled
+ifneq ($(USE_SQUASHFS),0)
+MKSQUASHFS = $(shell which mksquashfs)
+
 define build-squashfs-target
 	$(if $(shell $(MKSQUASHFS) -version | grep "version [0-3].[0-9]"),\
 		$(error Your mksquashfs is too old to work with kernel 2.6.29. Please upgrade to squashfs-tools 4.0))
 	$(hide) $(MKSQUASHFS) $(1) $(2) -noappend
 endef
+endif
 
 initrd_dir := $(LOCAL_PATH)/initrd
 initrd_bin := \
@@ -27,7 +32,7 @@ $(installer_ramdisk): $(initrd_bin) | $(ACP) $(MKBOOTFS)
 boot_dir := $(LOCAL_PATH)/boot
 boot_bin := $(wildcard $(boot_dir)/isolinux/*)
 
-BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,ramdisk.img system.img initrd.img)
+BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,ramdisk.img system.$(if $(MKSQUASHFS),sfs,img) initrd.img)
 BUILT_IMG += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)
 
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
@@ -40,10 +45,5 @@ $(ISO_IMAGE): $(BUILT_IMG) $(boot_bin)
 
 .PHONY: iso_img
 iso_img: $(ISO_IMAGE)
-
-# use squashfs for iso, unless explictly disabled
-ifneq ($(USE_SQUASHFS),0)
-iso_img: MKSQUASHFS = $(shell which mksquashfs)
-endif
 
 endif

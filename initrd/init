@@ -37,18 +37,18 @@ while [ 1 ]; do
 	for device in /dev/sr* /dev/sd[a-z]*; do
 		mount -o ro $device /mnt || continue
 		cd /mnt/$SRC
-		if [ ! -e ramdisk.img -o ! -e system.img ]; then
+		if [ ! -e ramdisk.img -o ! \( -e system.img -o -e system.sfs \) ]; then
 			umount /mnt
 			continue
 		fi
 		mount -t tmpfs tmpfs /android
 		cd /android
 		zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
-		mount -o loop,ro /mnt/$SRC/system.img /sfs
-		if [ -e /sfs/system.img ]; then
-			mount -o loop,ro /sfs/system.img system
+		if [ -e /mnt/$SRC/system.sfs ]; then
+			mount -o loop /mnt/$SRC/system.sfs /sfs
+			mount -o loop /sfs/system.img system
 		else
-			mount --move /sfs system
+			mount -o loop /mnt/$SRC/system.img system
 		fi
 		mkdir cache sdcard
 		mount -t tmpfs tmpfs cache
