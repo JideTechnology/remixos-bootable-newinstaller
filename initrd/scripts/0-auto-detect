@@ -106,7 +106,7 @@ detect_hardware()
 
 load_modules()
 {
-	detect_hardware
+	[ -z "$AUTO" ] && detect_hardware
 	if [ $? -eq 0 ]; then
 		for m in $PREDEV; do
 			modprobe $m
