@@ -25,11 +25,13 @@ auto_detect()
 # SNDDEV: sound driver
 # CAMDEV: camera driver
 # PREDEV: any module the drivers depend on but can't be loaded automatically
+# EXTMOD: any other module
 
 get_asus_info()
 {
 	# common for all Eee PC models
 	[ -c /dev/fb0 ] || FB0DEV=i915
+	EXTMOD=eeepc-laptop
 	PREDEV=snd-hda-codec-realtek
 	SNDDEV=snd-hda-intel
 	CAMDEV=uvcvideo
@@ -64,6 +66,11 @@ get_asus_info()
 			UVESA_MODE=${UVESA_MODE:-1024x600}
 			LANDEV=atl1e
 			WIFDEV=ath9k
+			;;
+		A6VM*)
+			EXTMOD=asus-laptop
+			LANDEV=skge
+			WIFDEV=ipw2200
 			;;
 		*)
 			LANDEV=atl1e
@@ -108,7 +115,7 @@ load_modules()
 {
 	[ -z "$AUTO" ] && detect_hardware
 	if [ $? -eq 0 ]; then
-		for m in $PREDEV; do
+		for m in $PREDEV $EXTMOD; do
 			modprobe $m
 		done
 		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
