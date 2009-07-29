@@ -90,7 +90,6 @@ load_modules
 
 mount_data
 mount_sdcard
-find_wifi_dev_name
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
