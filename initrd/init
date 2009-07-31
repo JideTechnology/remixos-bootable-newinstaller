@@ -62,14 +62,14 @@ done
 
 ln -s android/system /
 
-ln -s ../system/lib/modules /lib
+ln -s ../system/lib/firmware ../system/lib/modules /lib
 
 if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
-	mv /bin /lib /android
+	mv /bin /lib .
 	system/bin/ln -s android/lib /lib
 	system/bin/ln -s android/bin /bin
 	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|;s|\(/system\)\(/bin/sh\)|\2|' init.rc
-	mv /sbin/* /android/sbin
+	mv /sbin/* sbin
 	rmdir /sbin
 	ln -s android/sbin /
 fi
