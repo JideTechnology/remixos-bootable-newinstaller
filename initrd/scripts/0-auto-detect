@@ -115,7 +115,7 @@ find_wifi_dev_name()
 {
 	for wifi in `ls /sys/class/net`; do
 		w=/sys/class/net/$wifi
-		if [ -d $w/wireless ] || [ -d $w/phy80211 ]; then
+		if [ -d $w/wireless -o -d $w/phy80211 ]; then
 			sed -i "s|\(^ *service wpa_supplicant .*\)\(-i.*\)\( -c.*$\)|\1-i $wifi\3|g; \
 				s|\(^ *service dhcpcd /system/bin/dhcpcd \)\(.*\)$|\1$wifi|g" init.rc
 			break
