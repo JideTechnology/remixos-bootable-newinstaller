@@ -62,7 +62,7 @@ done
 
 ln -s android/system /
 
-ln -s ../system/lib/firmware ../system/lib/modules /lib
+ln -s ../system/lib/modules /lib
 
 if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
 	mv /bin /lib .
@@ -72,6 +72,8 @@ if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
 	mv /sbin/* sbin
 	rmdir /sbin
 	ln -s android/sbin /
+else
+	ln -s ../android/sbin/hotplug /sbin
 fi
 
 if [ -n "$DEBUG" ]; then
