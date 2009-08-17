@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/07/18
+# Last updated 2009/08/14
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -27,7 +27,7 @@ auto_detect()
 # PREDEV: any module the drivers depend on but can't be loaded automatically
 # EXTMOD: any other module
 
-get_asus_info()
+asus_info()
 {
 	# common for all Eee PC models
 	[ -c /dev/fb0 ] || FB0DEV=i915
@@ -79,36 +79,48 @@ get_asus_info()
 	esac
 }
 
-get_vbox_info()
+vbox_info()
 {
 	LANDEV=pcnet32
 	SNDDEV="snd-sb16 isapnp=0 irq=5"
+	VESA=1
 }
 
-get_qemu_info()
+qemu_info()
 {
 	LANDEV=8139cp
 	SNDDEV=snd-ens1370
 }
 
-get_vmware_info()
+vmware_info()
 {
 	LANDEV=pcnet32
 	SNDDEV=snd-ens1371
 }
 
-check_product()
-{
-	grep -q "$1" /sys/class/dmi/id/uevent
-}
-
 detect_hardware()
 {
-	check_product ASUSTeK && get_asus_info && return 0
-	check_product Acer.*AO && get_ao_info && return 0
-	check_product VirtualBox && get_vbox_info && return 0
-	check_product QEMU && get_qemu_info && return 0
-	check_product VMware && get_vmware_info && return 0
+	[ "$AUTO" = "1" ] && return
+	case "`cat /sys/class/dmi/id/uevent`" in
+		*ASUSTeK*)
+			get_info=asus_info
+			;;
+		*Acer*AO*)
+			get_info=ao_info
+			;;
+		*VirtualBox*)
+			get_info=vbox_info
+			;;
+		*QEMU*)
+			get_info=qemu_info
+			;;
+		*VMware*)
+			get_info=vmware_info
+			;;
+		*)
+			;;
+	esac
+	[ -n "$get_info" ] && $get_info && FOUND=1
 }
 
 find_wifi_dev_name()
@@ -125,8 +137,7 @@ find_wifi_dev_name()
 
 load_modules()
 {
-	[ -z "$AUTO" ] && detect_hardware
-	if [ $? -eq 0 ]; then
+	if [ -n "$FOUND" ]; then
 		for m in $PREDEV $EXTMOD; do
 			modprobe $m
 		done
@@ -140,6 +151,7 @@ load_modules()
 	fi
 
 	mdev -s
+	[ -c /dev/video0 ] || modprobe vivi
 	[ -d /proc/asound/card0 ] || modprobe snd-dummy
 	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=ywrap}
 

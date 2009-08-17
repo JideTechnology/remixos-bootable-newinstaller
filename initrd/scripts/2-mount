@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/07/21
+# Last updated 2009/08/13
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -9,6 +9,7 @@
 
 mount_data()
 {
+	mountpoint -q data && return
 	if [ -b "$DATA" ]; then
 		mount $DATA data
 	elif [ -b "/dev/$DATA" ]; then
@@ -23,6 +24,7 @@ mount_data()
 
 mount_sdcard()
 {
+	mountpoint -q sdcard && return
 	if [ -n "$SDCARD" ]; then
 		[ -b "$SDCARD" ] && SDCARD=`echo $SDCARD | sed "s|/dev/||g"`
 		if [ -b "/dev/$SDCARD" ]; then

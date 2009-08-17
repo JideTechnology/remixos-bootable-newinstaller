@@ -1,0 +1,210 @@
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2009/08/14
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
+
+tempfile=/tmp/temp-$$
+menufile=/tmp/menu-$$
+
+rebooting()
+{
+	dialog --title " Rebooting... " --nocancel --pause "" 8 41 1
+	sync
+	umount -a
+	reboot -f
+}
+
+choose()
+{
+	dialog --clear --title " $1 " \
+		--menu "$2" 20 71 13 --file $menufile 2> $tempfile
+
+	retval=$?
+	choice=`cat $tempfile`
+}
+
+select_dev()
+{
+	fdisk -l | grep ^/dev | cut -b6-12,55- | awk '{
+		if (!match($2, "Extended")) {
+			printf("\"%-28s", $0)
+			system("echo -n `cat /sys/block/*/"$1"/../device/model`")
+			printf("\" \"\"\n")
+		}
+	} END {
+		printf("\"Create/Modify partitions\" \"\"\n\"Detect devices\" \"\"")
+	}' > $menufile
+	choose "Choose Partition" "Please select a partition to install Android-x86:"
+	return $retval
+}
+
+progress_bar()
+{
+	dialog --clear --title " $1 " --gauge "\n $2" 8 70
+}
+
+format_fs()
+{
+	local cmd
+	echo -e '"Do not format" ""\next3 ""\next2 ""\nntfs ""\nfat32 ""' > $menufile
+	choose "Choose filesystem" "Please select a filesystem to format $1:"
+	case "$choice" in
+		ext3)
+			cmd="mke2fs -jL"
+			;;
+		ext2)
+			cmd="mke2fs -L"
+			;;
+		ntfs)
+			cmd="mkntfs -fL"
+			;;
+		fat32)
+			cmd="mkdosfs -vn"
+			;;
+		*)
+			;;
+	esac
+	if [ -n "$cmd" ]; then
+		dialog --title " Confirm " --no-label Skip --yesno \
+			"\n You chose to format $1 to $choice.\n All data in that partition will LOSE.\n\n Are you sure to format the partition $1?" 10 51
+		[ $? -ne 0 ] && return 1
+		$cmd Android-x86 /dev/$1 | awk '{
+			# FIXME: very imprecise progress
+			if (match($0, "done"))
+				printf("%d\n", i+=33)
+		}' | progress_bar "Formatting" "Formatting partition $1..."
+	fi
+}
+
+create_entry()
+{
+	title=$1
+	shift
+	echo -e "title $title\n\tkernel /$asrc/kernel$vga $@ SRC=/$asrc\n\tinitrd /$asrc/initrd.img\n" >> $menulst
+}
+
+create_menulst()
+{
+	menulst=/hd/grub/menu.lst
+	[ -n "$VESA" ] && vga=" vga=788"
+	echo -e "default=0\ntimeout=6\nroot (hd0,$1)\nsplashimage=/grub/android-x86.xpm.gz\n" > $menulst
+	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img *\)||; s|\(INSTALL=$INSTALL *\)||; s|\(SRC=$SRC *\)||; s|\(DEBUG=$DEBUG *\)||; s|\(BOOT_IMAGE.*\)||"`
+
+	create_entry "Android-x86 $VER" quiet $cmdline
+	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=1
+}
+
+install_to()
+{
+	mountpoint -q /hd && umount /hd
+	while [ 1 ]; do
+		format_fs $1
+		for m in mount /sbin/mount.*; do
+			# FIXME: how to mount fuse filesystem automatically?
+			$m /dev/$1 /hd && break
+		done
+		[ $? -eq 0 ] && break
+		dialog --clear --title " Error " --defaultno --yesno \
+			"\n Cannot mount /dev/$1\n Do you want to format it?" 8 37
+		[ $? -ne 0 ] && return 255
+	done
+
+	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
+	if [ "$fs" = "vfat" ]; then
+		dialog --title " Warning " --yesno \
+			"\nYou are going to install Android-x86 to a fat32 partition. Though this is possible, android cannot save user data to that partition. So data will be save to a RAMDISK(tmpfs), and lose after power off.\n\nAre you sure to continue?" 12 63
+		[ $? -ne 0 ] && return 1
+	fi
+
+	asrc=android-$VER
+	dialog --title " Confirm " --no-label Skip --yesno \
+		"\n Do you want to install boot loader GRUB?" 7 47
+	if [ $? -eq 0 ]; then
+		cp -af /grub /hd
+		d=0
+		while [ 1 ]; do
+			h=`echo $d | awk '{ printf("%c", $1+97) }'`
+			[ -d /sys/block/[sh]d$h/$1 ] && break
+			d=$(($d+1))
+		done
+		p=$((`echo $1 | sed "s/sd$h//"`-1))
+		create_menulst $p
+		echo "setup (hd$d) (hd$d,$p)" | grub > /dev/tty5
+		[ $? -ne 0 ] && return 255
+	fi
+
+	cd /mnt/$SRC
+	files="kernel initrd.img ramdisk.img system.*"
+	size=0
+	for s in `ls -ks $files | awk '{print $1}'`; do
+		size=$(($size+$s))
+	done
+	mkdir /hd/$asrc
+	( ls $files | cpio -H newc -o | pv -ns ${size}k | ( cd /hd/$asrc; cpio -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
+		| progress_bar "Installing Android-x86" "Expect to write $size KB..."
+
+	chmod 644 /hd/$asrc/*
+	chown 0.0 /hd/$asrc/*
+	[ "$fs" != "vfat" ] && mkdir /hd/$asrc/data
+	sync
+
+	return $((`cat /tmp/result`*255))
+}
+
+install_hd()
+{
+	mdev -s
+	select_dev || rebooting
+	retval=1
+	case "$choice" in
+		[sh]d*)
+			install_to $choice
+			retval=$?
+			;;
+		Create*)
+			cfdisk
+			;;
+		Detect*)
+			dialog --title " Detecting... " --nocancel --pause "" 8 41 1
+			;;
+	esac
+	return $retval
+}
+
+do_install()
+{
+	echo "0 0 0 0" > /proc/sys/kernel/printk
+	until install_hd; do
+		if [ $retval -eq 255 ]; then
+			dialog --title ' Error! ' --yes-label Retry --no-label Reboot \
+				--yesno '\n      Installation failed!' 7 35
+			[ $? -eq 1 ] && rebooting
+		fi
+	done
+
+	echo -e '"Run Android-x86" ""\n"Reboot" ""' > $menufile
+	dialog --clear --title ' Congratulations! ' \
+		--menu "\n Android-x86 is installed successfully.\n " 11 51 13 \
+		"Run Android-x86" "" "Reboot" "" 2> $tempfile
+	case "`cat $tempfile`" in
+		Run*)
+			cd /android
+			umount system
+			if mountpoint -q /sfs; then
+				umount /sfs
+				mount -o loop /hd/$asrc/system.sfs /sfs
+				mount -o loop /sfs/system.img system
+			else
+				mount -o loop /hd/$asrc/system.img system
+			fi
+			[ -d /hd/$asrc/data ] && mount --bind /hd/$asrc/data data
+			;;
+		Reboot)
+			rebooting
+			;;
+	esac
+}

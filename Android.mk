@@ -2,6 +2,8 @@ ifeq ($(TARGET_ARCH),x86)
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
+VER ?= $(shell date +"%F")
+
 LOCAL_MODULE := newinstaller
 LOCAL_MODULE_TAGS := system_builder
 
@@ -26,22 +28,26 @@ $(INITRD_RAMDISK): $(initrd_bin) | $(ACP) $(MKBOOTFS)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
-	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys tmp sfs)
+	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys tmp sfs hd)
+	echo "VER=$(VER)" > $(TARGET_INSTALLER_OUT)/scripts/10-ver
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
+
+INSTALL_RAMDISK := $(PRODUCT_OUT)/install.img
+$(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/*) | $(MKBOOTFS)
+	$(MKBOOTFS) $(dir $(dir $(<D))) | gzip -9 > $@
 
 boot_dir := $(PRODUCT_OUT)/boot
 $(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) | $(ACP)
 	rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
-	$(hide) sed -i "s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $@/isolinux/isolinux.cfg
 
-BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,ramdisk.img system.$(if $(MKSQUASHFS),sfs,img) initrd.img)
+BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,system.$(if $(MKSQUASHFS),sfs,img) ramdisk.img initrd.img install.img)
 BUILT_IMG += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)
 
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
 $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG)
 	@echo ----- Making iso image ------
-	$(hide) sed -i "s|DATE|`date +"%F"`|" $</isolinux/isolinux.cfg
+	$(hide) sed -i "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
 	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
 		-input-charset utf-8 -V "Android LiveCD" -o $@ $^

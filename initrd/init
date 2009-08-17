@@ -24,7 +24,7 @@ busybox --install -s
 
 export PATH=$PATH:/system/bin
 
-if [ -n "$DEBUG" ]; then
+if [ -n "$DEBUG" -o -n "$INSTALL" ]; then
 	mknod /dev/tty2 c 4 2 && openvt
 	mknod /dev/tty3 c 4 3 && openvt
 fi
@@ -35,9 +35,13 @@ while [ 1 ]; do
 	mdev -s
 
 	for device in /dev/sr* /dev/sd[a-z]*; do
-		mount -o ro $device /mnt || continue
+		# FIXME: any way to mount ntfs gracefully?
+		mount -o ro $device /mnt || \
+			mount.ntfs-3g -o rw $device /mnt || \
+			continue
 		cd /mnt/$SRC
 		if [ ! -e ramdisk.img -o ! \( -e system.img -o -e system.sfs \) ]; then
+			cd /
 			umount /mnt
 			continue
 		fi
@@ -64,6 +68,11 @@ ln -s android/system /
 
 ln -s ../system/lib/modules /lib
 
+if [ -n "$INSTALL" ]; then
+	cd /
+	zcat /mnt/$SRC/install.img | cpio -iud > /dev/null
+fi
+
 if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
 	mv /bin /lib .
 	system/bin/ln -s android/lib /lib
@@ -86,10 +95,10 @@ for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
 	source $s
 done
 
+detect_hardware
+do_install
+
 load_modules
-
-[ -n "$INSTALL" ] && install_hd
-
 mount_data
 mount_sdcard
 
@@ -104,4 +113,4 @@ else
 	exec switch_root /android /init
 fi
 
-sh # aviod kernel panic
+sh # avoid kernel panic
