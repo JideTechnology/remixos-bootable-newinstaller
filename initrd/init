@@ -8,6 +8,13 @@
 # with Android-x86 project.
 #
 
+try_mount()
+{
+	RW=$1; shift
+	# FIXME: any way to mount ntfs gracefully?
+	mount -o $RW $@ || mount.ntfs-3g -o rw,force $@
+}
+
 if [ -n "$DEBUG" ]; then
 	LOG=/tmp/log
 	set -x
@@ -27,6 +34,8 @@ export PATH=$PATH:/system/bin
 if [ -n "$DEBUG" -o -n "$INSTALL" ]; then
 	mknod /dev/tty2 c 4 2 && openvt
 	mknod /dev/tty3 c 4 3 && openvt
+else
+	echo 0 0 0 0 > /proc/sys/kernel/printk
 fi
 
 echo -n Detecting Android...
@@ -35,10 +44,7 @@ while [ 1 ]; do
 	mdev -s
 
 	for device in /dev/sr* /dev/sd[a-z]*; do
-		# FIXME: any way to mount ntfs gracefully?
-		mount -o ro $device /mnt || \
-			mount.ntfs-3g -o rw $device /mnt || \
-			continue
+		try_mount ro $device /mnt || continue
 		cd /mnt/$SRC
 		if [ ! -e ramdisk.img -o ! \( -e system.img -o -e system.sfs \) ]; then
 			cd /
