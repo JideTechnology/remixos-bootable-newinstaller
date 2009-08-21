@@ -92,7 +92,7 @@ create_menulst()
 	menulst=/hd/grub/menu.lst
 	[ -n "$VESA" ] && vga=" vga=788"
 	echo -e "default=0\ntimeout=6\nroot (hd0,$1)\nsplashimage=/grub/android-x86.xpm.gz\n" > $menulst
-	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img *\)||; s|\(INSTALL=$INSTALL *\)||; s|\(SRC=$SRC *\)||; s|\(DEBUG=$DEBUG *\)||; s|\(BOOT_IMAGE.*\)||"`
+	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img *\)||; s|quiet *||; s|\(vga=[0-9].. *\)||; s|\(INSTALL=$INSTALL *\)||; s|\(SRC=$SRC *\)||; s|\(DEBUG=$DEBUG *\)||; s|\(BOOT_IMAGE.*\)||"`
 
 	create_entry "Android-x86 $VER" quiet $cmdline
 	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=1
@@ -181,10 +181,10 @@ do_install()
 		fi
 	done
 
-	echo -e '"Run Android-x86" ""\n"Reboot" ""' > $menufile
+	[ -n "$VESA" ] || runit="Run Android-x86"
 	dialog --clear --title ' Congratulations! ' \
 		--menu "\n Android-x86 is installed successfully.\n " 11 51 13 \
-		"Run Android-x86" "" "Reboot" "" 2> $tempfile
+		"$runit" "" "Reboot" "" 2> $tempfile
 	case "`cat $tempfile`" in
 		Run*)
 			cd /android
@@ -198,7 +198,7 @@ do_install()
 			fi
 			[ -d /hd/$asrc/data ] && mount --bind /hd/$asrc/data data
 			;;
-		Reboot)
+		*)
 			rebooting
 			;;
 	esac

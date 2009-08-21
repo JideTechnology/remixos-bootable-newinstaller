@@ -16,5 +16,5 @@ title Live USB - Debug Mode
 	initrd /android-system/initrd.img
 
 title Installation - Install Android VER to harddisk
-	kernel /android-system/kernel CMDLINE quiet SRC=/android-system INSTALL=1 DEBUG=
+	kernel /android-system/kernel CMDLINE SRC=/android-system INSTALL=1 DEBUG=
 	initrd /android-system/initrd.img
