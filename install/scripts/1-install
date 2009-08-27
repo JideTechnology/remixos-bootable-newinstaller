@@ -129,6 +129,7 @@ install_to()
 		done
 		p=$((`echo $1 | sed "s/sd$h//"`-1))
 		create_menulst $p
+		rm -f /hd/boot/grub/stage1
 		echo "setup (hd$d) (hd$d,$p)" | grub > /dev/tty5
 		[ $? -ne 0 ] && return 255
 	fi
