@@ -130,6 +130,9 @@ find_network_dev_name()
 	rmline=`expr $rmline + 1`
 	sed -i -e "$rmline,\$d" init.rc
 	for netdev in `ls /sys/class/net`; do
+		if [ $netdev = "lo" -o $netdev = "wmaster0" ]; then
+			continue
+		fi		
 		w=/sys/class/net/$netdev
 		if [ -d $w/wireless -o -d $w/phy80211 ]; then
 			if [ $wififound -eq 0 ]; then
