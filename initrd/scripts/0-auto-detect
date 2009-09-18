@@ -39,7 +39,7 @@ asus_info()
 	board=`cat /sys/class/dmi/id/product_name`
 	# assume Eee PC models
 	case "$board" in
-		700|701|900)
+		700|701|702|900)
 			LANDEV=atl2
 			WIFDEV=ath5k
 			;;
