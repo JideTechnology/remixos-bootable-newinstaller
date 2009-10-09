@@ -31,7 +31,8 @@ asus_info()
 {
 	# common for all Eee PC models
 	[ -c /dev/fb0 ] || FB0DEV=i915
-	EXTMOD=eeepc-laptop
+	BTDEV="bnep rfcomm sco btusb"
+	EXTMOD="eeepc-laptop $BTDEV"
 	PREDEV=snd-hda-codec-realtek
 	SNDDEV=snd-hda-intel
 	CAMDEV=uvcvideo
