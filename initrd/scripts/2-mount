@@ -25,23 +25,22 @@ mount_data()
 mount_sdcard()
 {
 	mountpoint -q sdcard && return
-	if [ -n "$SDCARD" ]; then
-		sed -i "s|\(EXTERNAL_STORAGE_STATE \) .*|\1 mounted|g" init.rc
-		if [ -b "$SDCARD" ]; then
-			mount $SDCARD sdcard
-		elif [ -b "/dev/$SDCARD" ]; then
-			mount /dev/$SDCARD sdcard
-		elif [ "$SDCARD" = "premount" ]; then
-		   if [ -d /mnt/$SRC/sdcard ]; then
+	MOUNT_STATE=mounted
+	if [ -b "$SDCARD" ]; then
+		mount $SDCARD sdcard
+	elif [ -b "/dev/$SDCARD" ]; then
+		mount /dev/$SDCARD sdcard
+	elif [ "$SDCARD" = "premount" ]; then
+		if [ -d /mnt/$SRC/sdcard ]; then
 			mount -o remount,rw /mnt
 			mount --bind /mnt/$SRC/sdcard sdcard
-		   else
-			mount -t tmpfs tmpfs sdcard
-		   fi
+		elif [ -d data/sdcard ]; then
+			mount --bind data/sdcard sdcard
 		else
-			sed -i "s|\(EXTERNAL_STORAGE_STATE \) .*|\1 unmounted|g" init.rc
+			mount -t tmpfs tmpfs sdcard
 		fi
 	else
-		sed -i "s|\(EXTERNAL_STORAGE_STATE \) .*|\1 unmounted|g" init.rc
+		MOUNT_STATE=unmounted
 	fi
+	sed -i "s|\(EXTERNAL_STORAGE_STATE \).*|\1$MOUNT_STATE|g" init.rc
 }
