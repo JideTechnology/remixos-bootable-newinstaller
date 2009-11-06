@@ -31,8 +31,7 @@ asus_info()
 {
 	# common for all Eee PC models
 	[ -c /dev/fb0 ] || FB0DEV=i915
-	BTDEV="bnep rfcomm sco btusb"
-	EXTMOD="eeepc-laptop $BTDEV"
+	EXTMOD=eeepc-laptop
 	PREDEV=snd-hda-codec-realtek
 	SNDDEV=snd-hda-intel
 	CAMDEV=uvcvideo
@@ -151,7 +150,8 @@ find_network_dev_name()
 load_modules()
 {
 	if [ -n "$FOUND" ]; then
-		for m in $PREDEV $EXTMOD; do
+		BTDEV="bnep rfcomm sco btusb"
+		for m in $BTDEV $PREDEV $EXTMOD; do
 			modprobe $m
 		done
 		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
