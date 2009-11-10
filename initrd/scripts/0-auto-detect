@@ -151,7 +151,7 @@ load_modules()
 {
 	if [ -n "$FOUND" ]; then
 		BTDEV="bnep rfcomm sco btusb"
-		for m in $BTDEV $PREDEV $EXTMOD; do
+		for m in $PREDEV $EXTMOD $BTDEV; do
 			modprobe $m
 		done
 		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
