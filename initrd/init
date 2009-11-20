@@ -38,7 +38,7 @@ else
 	echo 0 0 0 0 > /proc/sys/kernel/printk
 fi
 
-echo -n Detecting Android...
+echo -n Detecting Android-x86...
 
 while [ 1 ]; do
 	mdev -s

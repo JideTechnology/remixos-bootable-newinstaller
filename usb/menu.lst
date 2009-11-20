@@ -3,7 +3,7 @@ timeout=6
 root (hd0,0)
 splashimage=/android-x86.xpm.gz
 
-title Live USB - Run Android without Installation
+title Live USB - Run Android-x86 without Installation
 	kernel /android-system/kernel CMDLINE quiet SRC=/android-system
 	initrd /android-system/initrd.img
 
@@ -15,6 +15,6 @@ title Live USB - Debug Mode
 	kernel /android-system/kernel CMDLINE vga=788 SRC=/android-system DEBUG=1
 	initrd /android-system/initrd.img
 
-title Installation - Install Android VER to harddisk
+title Installation - Install Android-x86 VER to harddisk
 	kernel /android-system/kernel CMDLINE SRC=/android-system INSTALL=1 DEBUG=
 	initrd /android-system/initrd.img
