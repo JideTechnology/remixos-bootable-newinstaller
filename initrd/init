@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/07/18
+# Last updated 2009/12/10
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -101,8 +101,20 @@ for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
 	source $s
 done
 
-detect_hardware
-do_install
+# A target should provide its detect_hardware function.
+# On success, return 0 with the following values set.
+#
+# FB0DEV: framebuffer driver
+# LANDEV: lan driver
+# WIFDEV: wifi driver
+# SNDDEV: sound driver
+# CAMDEV: camera driver
+# PREDEV: any module the drivers depend on but can't be loaded automatically
+# EXTMOD: any other module
+
+[ "$AUTO" != "1" ] && detect_hardware 2> /dev/null && FOUND=1
+
+[ -n "$INSTALL" ] && do_install
 
 load_modules
 mount_data

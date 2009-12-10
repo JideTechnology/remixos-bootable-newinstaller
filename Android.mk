@@ -24,12 +24,13 @@ initrd_bin := \
 	$(wildcard $(initrd_dir)/*/*)
 
 INITRD_RAMDISK := $(PRODUCT_OUT)/initrd.img
-$(INITRD_RAMDISK): $(initrd_bin) | $(ACP) $(MKBOOTFS)
+$(INITRD_RAMDISK): $(initrd_bin) $(TARGET_INITRD_SCRIPTS) | $(ACP) $(MKBOOTFS)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
+	$(if $(TARGET_INITRD_SCRIPTS),$(ACP) -p $(TARGET_INITRD_SCRIPTS) $(TARGET_INSTALLER_OUT)/scripts)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
 	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android mnt proc sys tmp sfs hd)
-	echo "VER=$(VER)" > $(TARGET_INSTALLER_OUT)/scripts/10-ver
+	echo "VER=$(VER)" > $(TARGET_INSTALLER_OUT)/scripts/00-ver
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
 
 INSTALL_RAMDISK := $(PRODUCT_OUT)/install.img

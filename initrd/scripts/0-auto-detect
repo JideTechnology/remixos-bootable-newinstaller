@@ -1,11 +1,17 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/08/14
+# Last updated 2009/12/10
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
 # with Android-x86 project.
 #
+
+error()
+{
+	echo $*
+	return 1
+}
 
 # An auto detect function provided by kinneko
 auto_detect()
@@ -17,110 +23,6 @@ auto_detect()
 	echo 'esac; done; }' >> $tmp
 	source $tmp
 	cat /sys/bus/*/devices/*/modalias | dev2mod
-}
-
-# FB0DEV: framebuffer driver
-# LANDEV: lan driver
-# WIFDEV: wifi driver
-# SNDDEV: sound driver
-# CAMDEV: camera driver
-# PREDEV: any module the drivers depend on but can't be loaded automatically
-# EXTMOD: any other module
-
-asus_info()
-{
-	# common for all Eee PC models
-	[ -c /dev/fb0 ] || FB0DEV=i915
-	EXTMOD=eeepc-laptop
-	PREDEV=snd-hda-codec-realtek
-	SNDDEV=snd-hda-intel
-	CAMDEV=uvcvideo
-
-	board=`cat /sys/class/dmi/id/product_name`
-	# assume Eee PC models
-	case "$board" in
-		700|701|702|900)
-			LANDEV=atl2
-			WIFDEV=ath5k
-			;;
-		701SD|900SD)
-			LANDEV=atl1e
-			WIFDEV=rtl8187se
-			;;
-		900A|904HD|1000HD)
-			LANDEV=atl1e
-			WIFDEV=ath5k
-			;;
-		901|1000|1000H)
-			LANDEV=atl1e
-			WIFDEV=rt2860sta
-			;;
-		ET1602*)
-			FB0DEV=
-			UVESA_MODE=${UVESA_MODE:-1366x768}
-			LANDEV=r8169
-			WIFDEV=rt2860sta
-			;;
-		T91)
-			FB0DEV=
-			UVESA_MODE=${UVESA_MODE:-1024x600}
-			LANDEV=atl1e
-			WIFDEV=ath9k
-			;;
-		A6VM*)
-			EXTMOD=asus-laptop
-			LANDEV=skge
-			WIFDEV=ipw2200
-			;;
-		*)
-			LANDEV=atl1e
-			WIFDEV=ath9k
-			;;
-	esac
-}
-
-vbox_info()
-{
-	LANDEV=pcnet32
-	SNDDEV="snd-sb16 isapnp=0 irq=5"
-	VESA=1
-}
-
-qemu_info()
-{
-	LANDEV=8139cp
-	SNDDEV=snd-ens1370
-}
-
-vmware_info()
-{
-	LANDEV=pcnet32
-	SNDDEV=snd-ens1371
-}
-
-detect_hardware()
-{
-	[ "$AUTO" = "1" ] && return
-	case "`cat /sys/class/dmi/id/uevent`" in
-		*ASUSTeK*)
-			get_info=asus_info
-			;;
-		*Acer*AO*)
-			get_info=ao_info
-			;;
-		*VirtualBox*)
-			get_info=vbox_info
-			;;
-		*QEMU*)
-			get_info=qemu_info
-			;;
-		*VMware*)
-			get_info=vmware_info
-			;;
-		*)
-			;;
-	esac
-	[ -n "$get_info" ] && $get_info && FOUND=1
 }
 
 find_network_dev_name()

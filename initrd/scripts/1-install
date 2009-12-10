@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/08/17
+# Last updated 2009/12/10
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -9,6 +9,6 @@
 
 do_install()
 {
-	[ -z "$INSTALL" ] && return
-	dialog --title " WARNING " --msgbox '\n  Installation is not implemented yet.\n  Press OK to run live version.' 8 45
+	error -e '\n  Android-x86 installer is not available.\n  Press RETURN to run live version.\n'
+	read
 }
