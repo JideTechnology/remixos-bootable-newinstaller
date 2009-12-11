@@ -119,6 +119,7 @@ done
 load_modules
 mount_data
 mount_sdcard
+setup_tslib
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"

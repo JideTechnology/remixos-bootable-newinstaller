@@ -1,0 +1,15 @@
+setup_tslib()
+{
+	# setup for pointercal
+	if [ -n "$BOARD_USES_TSLIB" ]; then
+		TSLIBPATH=data/system/tslib
+		if [ ! -e $TSLIBPATH/pointercal ]; then
+			if [ -e system/etc/pointercal ]; then
+				mkdir -p $TSLIBPATH
+				cp system/etc/pointercal $TSLIBPATH
+				chmod 666 $TSLIBPATH/pointercal
+				chown -R 1000.1000 data
+			fi
+		fi
+	fi
+}
