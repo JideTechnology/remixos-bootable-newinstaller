@@ -68,7 +68,7 @@ load_modules()
 	mdev -s
 	[ -c /dev/video0 ] || modprobe vivi
 	[ -d /proc/asound/card0 ] || modprobe snd-dummy
-	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=ywrap}
+	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
 	find_network_dev_name
 #	find_wifi_dev_name
 }
