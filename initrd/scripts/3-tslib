@@ -4,12 +4,23 @@ setup_tslib()
 	if [ -n "$BOARD_USES_TSLIB" ]; then
 		TSLIBPATH=data/system/tslib
 		if [ ! -e $TSLIBPATH/pointercal ]; then
-			if [ -e system/etc/pointercal ]; then
-				mkdir -p $TSLIBPATH
-				cp system/etc/pointercal $TSLIBPATH
-				chmod 666 $TSLIBPATH/pointercal
-				chown -R 1000.1000 data
+			mkdir -p $TSLIBPATH
+			if [ -z "$CALIBRATE" -a -n "`ls system/etc/pointercal*`" ]; then
+				board=`cat /sys/class/dmi/id/product_name`
+				[ -e system/etc/pointercal.$board ] && pointercal=system/etc/pointercal.$board
+				[ -e system/etc/pointercal ] && pointercal=system/etc/pointercal
 			fi
+			if [ -n "$pointercal" ]; then
+				cp $pointercal $TSLIBPATH/pointercal
+			elif [ -e system/etc/ts.env ]; then
+				sed 's|\(/dev\)\([/][^/]*[/]\)|\1/|; s|^T|export T|' system/etc/ts.env > /ts.env
+				. /ts.env
+				ln -s android/data /
+				mdev -s
+				ts_calibrate
+			fi
+			chmod 666 $TSLIBPATH/pointercal
+			chown -R 1000.1000 data
 		fi
 	fi
 }
