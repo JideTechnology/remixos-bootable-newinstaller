@@ -13,11 +13,12 @@ setup_tslib()
 			if [ -n "$pointercal" ]; then
 				cp $pointercal $TSLIBPATH/pointercal
 			elif [ -e system/etc/ts.env ]; then
-				sed 's|\(/dev\)\([/][^/]*[/]\)|\1/|; s|^T|export T|' system/etc/ts.env > /ts.env
-				. /ts.env
 				ln -s android/data /
 				mdev -s
-				ts_calibrate
+				mkdir /dev/graphics /dev/input
+				ln -s /dev/fb* /dev/graphics
+				ln -s /dev/event* /dev/input
+				ts_calibrate > /tmp/cal.log
 			fi
 			chmod 666 $TSLIBPATH/pointercal
 			chown -R 1000.1000 data
