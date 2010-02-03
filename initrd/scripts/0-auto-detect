@@ -31,6 +31,7 @@ find_network_dev_name()
 	rmline=`grep -n "#REMOVE FROM HERE" init.rc|cut -d':' -f1`
 	rmline=`expr $rmline + 1`
 	sed -i -e "$rmline,\$d" init.rc
+	dhcpcdopts="-o domain_name_servers -BKL"
 	for netdev in `ls /sys/class/net`; do
 		if [ $netdev = "lo" -o $netdev = "wmaster0" ]; then
 			continue
@@ -42,10 +43,8 @@ find_network_dev_name()
 				wififound=1
 			fi
 		fi
-		echo "service dhcpcd$netdev /system/bin/dhcpcd $netdev" >> init.rc
-		echo "   group system dhcp" >> init.rc
-		echo "   disabled" >>init.rc
-		echo "   oneshot" >> init.rc
+		echo "service dhcpcd$netdev /system/bin/dhcpcd $dhcpcdopts $netdev" >> init.rc
+		echo -e "   group system dhcp\n   disabled\n   oneshot\n" >> init.rc
 	done
 }
 
