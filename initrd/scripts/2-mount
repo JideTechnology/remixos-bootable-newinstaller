@@ -28,16 +28,16 @@ mount_sdcard()
 	if [ "$SDCARD" = "premount" ]; then
 		if [ -d /mnt/$SRC/sdcard ]; then
 			mount -o remount,rw /mnt
-			mount --bind /mnt/$SRC/sdcard sdcard
+			mount --bind /mnt/$SRC/sdcard mnt/sdcard
 		elif [ -d data/sdcard ]; then
-			mount --bind data/sdcard sdcard
+			mount --bind data/sdcard mnt/sdcard
 		else
-			mount -t tmpfs tmpfs sdcard
+			mount -t tmpfs tmpfs mnt/sdcard
 		fi
 	elif [ -b "$SDCARD" ]; then
-		mount $SDCARD sdcard
+		mount $SDCARD mnt/sdcard
 	elif [ -b "/dev/$SDCARD" ]; then
-		mount /dev/$SDCARD sdcard
+		mount /dev/$SDCARD mnt/sdcard
 	else
 		false
 	fi
