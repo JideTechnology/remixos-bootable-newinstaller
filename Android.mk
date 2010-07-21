@@ -70,9 +70,10 @@ $(usb_tmp_img): $(wildcard $(LOCAL_PATH)/usb/*) $(BUILT_IMG) | $(ACP) $(MKEXT2IM
 	num_inodes=`find $(USB_BOOT) | wc -l`; \
 	$(MKEXT2IMG) -d $(USB_BOOT) -b `expr $$num_blocks + 20480` -N `expr $$num_inodes + 15` -m 0 $@
 
+edit_mbr := $(HOST_OUT_EXECUTABLES)/editdisklbl
 USB_LAYOUT := $(LOCAL_PATH)/usb_layout.conf
 USB_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)_usb.img
-$(USB_IMAGE): $(usb_tmp_img) $(USB_LAYOUT) $(PRODUCT_OUT)/grub/grub.bin
+$(USB_IMAGE): $(usb_tmp_img) $(USB_LAYOUT) $(PRODUCT_OUT)/grub/grub.bin | $(edit_mbr)
 	@echo ----- Making usb image ------
 	@sed 's|default 2|default 0|' $(PRODUCT_OUT)/grub/grub.bin > $@
 	@$(edit_mbr) -l $(USB_LAYOUT) -i $@ usb_boot=$(usb_tmp_img)
@@ -80,5 +81,7 @@ $(USB_IMAGE): $(usb_tmp_img) $(USB_LAYOUT) $(PRODUCT_OUT)/grub/grub.bin
 .PHONY: iso_img usb_img
 iso_img: $(ISO_IMAGE)
 usb_img: $(USB_IMAGE)
+
+include $(call first-makefiles-under,$(LOCAL_PATH))
 
 endif
