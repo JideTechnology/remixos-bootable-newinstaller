@@ -112,7 +112,7 @@ done
 # PREDEV: any module the drivers depend on but can't be loaded automatically
 # EXTMOD: any other module
 
-[ "$AUTO" != "1" ] && detect_hardware 2> /dev/null && FOUND=1
+[ "$AUTO" != "1" ] && detect_hardware && FOUND=1
 
 [ -n "$INSTALL" ] && do_install
 
