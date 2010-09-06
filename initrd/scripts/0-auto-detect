@@ -25,13 +25,15 @@ auto_detect()
 	cat /sys/bus/*/devices/*/modalias | dev2mod
 }
 
+load_uvesafb()
+{
+	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
+}
+
 load_modules()
 {
 	if [ -n "$FOUND" ]; then
-		BTDEV="bnep rfcomm sco btusb"
-		for m in $PREDEV $EXTMOD $BTDEV; do
-			modprobe $m
-		done
+		[ -n "$PREDEV" ] && modprobe $PREDEV
 		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
 		[ -n "$LANDEV" ] && modprobe $LANDEV
 		[ -n "$WIFDEV" ] && modprobe $WIFDEV
@@ -41,8 +43,16 @@ load_modules()
 		auto_detect
 	fi
 
+	# bluetooth modules
+	EXTMOD="$EXTMOD bnep rfcomm sco btusb"
+	# 3G modules
+	EXTMOD="$EXTMOD cdc-acm option pppoe ppp-async ppp-deflate bsd-comp"
+	for m in $EXTMOD; do
+		modprobe $m
+	done
+
 	mdev -s
 	[ -c /dev/video0 ] || modprobe vivi
 	[ -d /proc/asound/card0 ] || modprobe snd-dummy
-	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
+	load_uvesafb
 }
