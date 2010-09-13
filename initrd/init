@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/07/07
+# Last updated 2010/09/13
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -83,7 +83,7 @@ if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
 	mv /bin /lib .
 	system/bin/ln -s android/lib /lib
 	system/bin/ln -s android/bin /bin
-	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|;s|\(/system\)\(/bin/sh\)|\2|' init.rc
+	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|' init.rc
 	mv /sbin/* sbin
 	rmdir /sbin
 	ln -s android/sbin /
