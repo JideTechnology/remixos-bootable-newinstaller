@@ -1,0 +1,16 @@
+#
+# By Chih-Wei Huang <cwhuang@linux.org.tw>
+# Last updated 2010/10/14
+#
+# License: GNU Public License
+# We explicitely grant the right to use the scripts
+# with Android-x86 project.
+#
+
+if [ -n "$HDPI" ]; then
+	d=240
+elif [ -n "$MDPI" ]; then
+	d=160
+fi
+
+echo ro.sf.lcd_density=$d >> default.prop

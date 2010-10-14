@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/08/14
+# Last updated 2010/10/14
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -92,10 +92,26 @@ create_menulst()
 	menulst=/hd/grub/menu.lst
 	[ -n "$VESA" ] && vga=" vga=788"
 	echo -e "default=0\ntimeout=6\nroot (hd0,$1)\nsplashimage=/grub/android-x86.xpm.gz\n" > $menulst
-	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img *\)||; s|quiet *||; s|\(vga=[0-9].. *\)||; s|\(INSTALL=$INSTALL *\)||; s|\(SRC=$SRC *\)||; s|\(DEBUG=$DEBUG *\)||; s|\(BOOT_IMAGE.*\)||"`
+	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(.DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE.*\)||"`
 
-	create_entry "Android-x86 $VER" quiet $cmdline
+	create_entry "Android-x86 $VER (HDPI)" quiet $cmdline HDPI=1
+	create_entry "Android-x86 $VER (MDPI)" quiet $cmdline MDPI=1
 	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=1
+}
+
+create_winitem()
+{
+	win=`fdisk -l /dev/$(echo $1 | cut -b-3) | grep ^/dev | cut -b6-12,55- | awk '{
+		if (match($2, "NTFS"))
+			print $1
+	}' | head -1`
+	if [ -n "$win" ]; then
+		dialog --title " Confirm " --yesno \
+			"\nThe installer found a Windows partition in /dev/$win.\n\nDo you want to create a boot item for Windows?" 9 59
+		[ $? -ne 0 ] && return 1
+		p=$((`echo $win | cut -b4-`-1))
+		echo -e "title Windows\n\trootnoverify (hd$d,$p)\n\tchainloader +1\n" >> $menulst
+	fi
 }
 
 install_to()
@@ -114,6 +130,10 @@ install_to()
 		dialog --title " Warning " --yesno \
 			"\nYou are going to install Android-x86 to a fat32 partition. Though this is possible, android cannot save user data to that partition. So data will be save to a RAMDISK(tmpfs), and lose after power off.\n\nAre you sure to continue?" 12 63
 		[ $? -ne 0 ] && return 1
+	elif [ "$fs" = "fuseblk" ]; then
+		dialog --title " Warning " --yesno \
+			"\nYou are going to install Android-x86 to an NTFS partition. Though this is possible, some user data cannot be saved properly to that partition and will lose after power off.\n\nAre you sure to continue?" 11 63
+		[ $? -ne 0 ] && return 1
 	fi
 
 	asrc=android-$VER
@@ -127,8 +147,9 @@ install_to()
 			[ -d /sys/block/[sh]d$h/$1 ] && break
 			d=$(($d+1))
 		done
-		p=$((`echo $1 | sed "s/sd$h//"`-1))
+		p=$((`echo $1 | cut -b4-`-1))
 		create_menulst $p
+		create_winitem $1 $d
 		rm -f /hd/boot/grub/stage1
 		echo "setup (hd$d) (hd$d,$p)" | grub > /dev/tty5
 		[ $? -ne 0 ] && return 255
