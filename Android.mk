@@ -23,8 +23,10 @@ initrd_bin := \
 	$(initrd_dir)/init \
 	$(wildcard $(initrd_dir)/*/*)
 
+systemimg  := $(PRODUCT_OUT)/system.$(if $(MKSQUASHFS),sfs,img)
+
 INITRD_RAMDISK := $(PRODUCT_OUT)/initrd.img
-$(INITRD_RAMDISK): $(initrd_bin) $(TARGET_INITRD_SCRIPTS) | $(ACP) $(MKBOOTFS)
+$(INITRD_RAMDISK): $(initrd_bin) $(systemimg) $(TARGET_INITRD_SCRIPTS) | $(ACP) $(MKBOOTFS)
 	rm -rf $(TARGET_INSTALLER_OUT)
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	$(if $(TARGET_INITRD_SCRIPTS),$(ACP) -p $(TARGET_INITRD_SCRIPTS) $(TARGET_INSTALLER_OUT)/scripts)
@@ -42,7 +44,7 @@ $(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) | $(ACP)
 	rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
 
-BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,system.$(if $(MKSQUASHFS),sfs,img) ramdisk.img initrd.img install.img)
+BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,ramdisk.img initrd.img install.img) $(systemimg)
 BUILT_IMG += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)
 
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
