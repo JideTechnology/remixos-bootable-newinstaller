@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/08/13
+# Last updated 2010/11/17
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -25,6 +25,9 @@ mount_data()
 mount_sdcard()
 {
 	mountpoint -q sdcard && return
+	# WARNING: premount the sdcard is deprecated since froyo-x86.
+	# It is left only for backward compatibility and may be removed
+	# in the future.
 	if [ "$SDCARD" = "premount" ]; then
 		if [ -d /mnt/$SRC/sdcard ]; then
 			mount -o remount,rw /mnt
@@ -32,14 +35,7 @@ mount_sdcard()
 		elif [ -d data/sdcard ]; then
 			mount --bind data/sdcard mnt/sdcard
 		else
-			mount -t tmpfs tmpfs mnt/sdcard
+			mount -o mode=2777,uid=1000,gid=1015 -t tmpfs tmpfs mnt/sdcard
 		fi
-	elif [ -b "$SDCARD" ]; then
-		mount $SDCARD mnt/sdcard
-	elif [ -b "/dev/$SDCARD" ]; then
-		mount /dev/$SDCARD mnt/sdcard
-	else
-		false
 	fi
-	[ $? -eq 0 ] && sed -i "s|\(EXTERNAL_STORAGE_STATE \).*|\1mounted|g" init.rc
 }
