@@ -1,3 +1,17 @@
+# Copyright 2009-2010, The Android-x86 Open Source Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 ifeq ($(TARGET_ARCH),x86)
 LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
@@ -17,6 +31,27 @@ define build-squashfs-target
 	$(hide) $(MKSQUASHFS) $(1) $(2) -noappend
 endef
 endif
+
+define check-density
+	-eval d=$$(grep ^ro.sf.lcd_density $(INSTALLED_DEFAULT_PROP_TARGET) $(INSTALLED_BUILD_PROP_TARGET) | sed 's|\(.*\)=\(.*\)|\2|'); \
+	[ -n "$$d" ] && awk -v d=$$d ' BEGIN { \
+		if (d <= 180) { \
+			label="liveh"; dpi="HDPI"; \
+		} else { \
+			label="livem"; dpi="MDPI"; \
+		} \
+	} { \
+		if (match($$2, label)) \
+			s=5; \
+		else if (match($$0, dpi)) \
+			s=4; \
+		else \
+			s=0; \
+		for (i = 0; i < s; ++i) \
+			getline; \
+		gsub(" DPI=[0-9]*",""); print $$0; \
+	}' $(1) > $(1)_ && mv $(1)_ $(1)
+endef
 
 initrd_dir := $(LOCAL_PATH)/initrd
 initrd_bin := \
@@ -41,7 +76,7 @@ $(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/*) | $(MKBOOTFS)
 	$(MKBOOTFS) $(dir $(dir $(<D))) | gzip -9 > $@
 
 boot_dir := $(PRODUCT_OUT)/boot
-$(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) | $(ACP)
+$(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) $(systemimg) | $(ACP)
 	rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
 
@@ -51,10 +86,11 @@ BUILT_IMG += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
 $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG) $(GENERIC_X86_CONFIG_MK)
 	@echo ----- Making iso image ------
+	$(hide) $(call check-density,$</isolinux/isolinux.cfg)
 	$(hide) sed -i "s|\(Installation CD\)\(.*\)|\1 $(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
 	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
-		-input-charset utf-8 -V "Android LiveCD" -o $@ $^
+		-input-charset utf-8 -V "Android-x86 LiveCD" -o $@ $^
 
 ANDROID_SRC := /android-system
 USB_BOOT := $(PRODUCT_OUT)/usb_boot
@@ -68,6 +104,7 @@ $(usb_tmp_img): $(wildcard $(LOCAL_PATH)/usb/*) $(BUILT_IMG) | $(ACP) $(MKEXT2IM
 	ln $(BUILT_IMG) $(USB_BOOT)$(ANDROID_SRC)
 	$(ACP) -fp $(<D)/* $(<D)/../install/grub/android-x86.xpm.gz $(USB_BOOT)
 	ln -s grub4dos $(USB_BOOT)/kernel
+	$(hide) $(call check-density,$(USB_BOOT)/menu.lst)
 	$(hide) sed -i "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(USB_BOOT)/menu.lst
 	num_blocks=`du -sk $(USB_BOOT) | tail -n1 | awk '{print $$1;}'`; \
 	num_inodes=`find $(USB_BOOT) | wc -l`; \

@@ -7,10 +7,4 @@
 # with Android-x86 project.
 #
 
-if [ -n "$HDPI" ]; then
-	d=240
-elif [ -n "$MDPI" ]; then
-	d=160
-fi
-
-echo ro.sf.lcd_density=$d >> default.prop
+[ -n "$DPI" ] && echo ro.sf.lcd_density=$DPI >> default.prop

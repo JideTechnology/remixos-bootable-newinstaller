@@ -4,11 +4,11 @@ root (hd0,0)
 splashimage=/android-x86.xpm.gz
 
 title Live USB - Run Android-x86 without Installation (HDPI)
-	kernel /android-system/kernel CMDLINE quiet SRC=/android-system HDPI=1
+	kernel /android-system/kernel CMDLINE quiet SRC=/android-system DPI=240
 	initrd /android-system/initrd.img
 
 title Live USB - Run Android-x86 without Installation (MDPI)
-	kernel /android-system/kernel CMDLINE quiet SRC=/android-system MDPI=1
+	kernel /android-system/kernel CMDLINE quiet SRC=/android-system DPI=160
 	initrd /android-system/initrd.img
 
 title Live USB - VESA Mode
