@@ -28,6 +28,7 @@ auto_detect()
 load_uvesafb()
 {
 	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
+	[ -c /dev/card0 ] || export HWACCEL=0
 }
 
 load_modules()
