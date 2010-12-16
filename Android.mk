@@ -33,8 +33,8 @@ endef
 endif
 
 define check-density
-	-eval d=$$(grep ^ro.sf.lcd_density $(INSTALLED_DEFAULT_PROP_TARGET) $(INSTALLED_BUILD_PROP_TARGET) | sed 's|\(.*\)=\(.*\)|\2|'); \
-	[ -n "$$d" ] && awk -v d=$$d ' BEGIN { \
+	eval d=$$(grep ^ro.sf.lcd_density $(INSTALLED_DEFAULT_PROP_TARGET) $(INSTALLED_BUILD_PROP_TARGET) | sed 's|\(.*\)=\(.*\)|\2|'); \
+	[ -z "$$d" ] || ( awk -v d=$$d ' BEGIN { \
 		if (d <= 180) { \
 			label="liveh"; dpi="HDPI"; \
 		} else { \
@@ -50,7 +50,7 @@ define check-density
 		for (i = 0; i < s; ++i) \
 			getline; \
 		gsub(" DPI=[0-9]*",""); print $$0; \
-	}' $(1) > $(1)_ && mv $(1)_ $(1)
+	}' $(1) > $(1)_ && mv $(1)_ $(1) )
 endef
 
 initrd_dir := $(LOCAL_PATH)/initrd
