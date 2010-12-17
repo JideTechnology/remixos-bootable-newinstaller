@@ -17,8 +17,11 @@ mount_data()
 	elif [ -d /mnt/$SRC/data ]; then
 		mount -o remount,rw /mnt
 		mount --bind /mnt/$SRC/data data
+	elif [ -f /mnt/$SRC/data.img ]; then
+		mount -o remount,rw /mnt
+		mount -o loop /mnt/$SRC/data.img data
 	else
-		mount -t tmpfs tmpfs data
+		device_mount_data || mount -t tmpfs tmpfs data
 	fi
 }
 
