@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/09/13
+# Last updated 2010/12/18
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -46,7 +46,7 @@ while [ 1 ]; do
 	for device in /dev/sr* /dev/sd[a-z]*; do
 		try_mount ro $device /mnt || continue
 		cd /mnt/$SRC
-		if [ ! -e ramdisk.img -o ! \( -e system.img -o -e system.sfs \) ]; then
+		if [ ! -e ramdisk.img -o ! \( -e system.sfs -o -e system.img -o -d system \) ]; then
 			cd /
 			umount /mnt
 			continue
@@ -57,8 +57,11 @@ while [ 1 ]; do
 		if [ -e /mnt/$SRC/system.sfs ]; then
 			mount -o loop /mnt/$SRC/system.sfs /sfs
 			mount -o loop /sfs/system.img system
-		else
+		elif [ -e /mnt/$SRC/system.img ]; then
 			mount -o loop /mnt/$SRC/system.img system
+		else
+			mount -o remount,rw /mnt
+			mount --bind /mnt/$SRC/system system
 		fi
 		mkdir cache mnt mnt/sdcard
 		mount -t tmpfs tmpfs cache

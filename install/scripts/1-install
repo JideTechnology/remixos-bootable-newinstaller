@@ -159,19 +159,29 @@ install_to()
 		[ $? -ne 0 ] && return 255
 	fi
 
-	cd /mnt/$SRC
-	files="kernel initrd.img ramdisk.img system.*"
+	dialog --title " Question " --defaultno --yesno \
+		"\nDo you want to install /system directory as read-write?\n\nLet /system be read-write make it easier to debug, but it needs more disk space and longer installation time." 10 61
+	instal_rw=$?
+
+	cd /
+	files="mnt/$SRC/kernel mnt/$SRC/initrd.img mnt/$SRC/ramdisk.img"
+	[ $instal_rw -eq 0 ] && files="$files android/system" || files="$files mnt/$SRC/system.*"
 	size=0
-	for s in `ls -ks $files | awk '{print $1}'`; do
+	for s in `du -sk $files | awk '{print $1}'`; do
 		size=$(($size+$s))
 	done
-	mkdir /hd/$asrc
-	( ls $files | cpio -H newc -o | pv -ns ${size}k | ( cd /hd/$asrc; cpio -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
+	mkdir hd/$asrc
+	cd hd/$asrc
+	rm -rf system*
+	( ( cd /; find $files | cpio -H newc -o ) | pv -ns ${size}k | ( cpio -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
 		| progress_bar "Installing Android-x86" "Expect to write $size KB..."
 
-	chmod 644 /hd/$asrc/*
-	chown 0.0 /hd/$asrc/*
-	[ "$fs" != "vfat" ] && mkdir /hd/$asrc/data
+	chmod 644 *
+	chown 0.0 *
+	mv mnt/$SRC/* . && rm -rf mnt
+	[ -d android ] && mv android/* . && rmdir android
+
+	[ "$fs" != "vfat" ] && mkdir data
 	sync
 
 	return $((`cat /tmp/result`*255))
