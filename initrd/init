@@ -15,6 +15,11 @@ try_mount()
 	mount -o $RW $@ || mount.ntfs-3g -o rw,force $@
 }
 
+remount_rw()
+{
+	mount -o remount,rw /mnt
+}
+
 if [ -n "$DEBUG" ]; then
 	LOG=/tmp/log
 	set -x
@@ -60,7 +65,7 @@ while [ 1 ]; do
 		elif [ -e /mnt/$SRC/system.img ]; then
 			mount -o loop /mnt/$SRC/system.img system
 		else
-			mount -o remount,rw /mnt
+			remount_rw
 			mount --bind /mnt/$SRC/system system
 		fi
 		mkdir cache mnt mnt/sdcard

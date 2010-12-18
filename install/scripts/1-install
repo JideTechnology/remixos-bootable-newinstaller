@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/10/14
+# Last updated 2010/12/19
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -63,7 +63,7 @@ format_fs()
 			cmd="mkntfs -fL"
 			;;
 		fat32)
-			cmd="mkdosfs -vn"
+			cmd="newfs_msdos -L"
 			;;
 		*)
 			;;
@@ -118,6 +118,59 @@ create_winitem()
 	fi
 }
 
+create_img()
+{
+	bname=`basename $2`
+	if [ -e $2 ]; then
+		dialog --title " Confirm " --yesno \
+			"\n $bname exists. Overwrite it?" 7 38
+		[ $? -ne 0 ] && return 255
+		rm -f $2
+	fi
+	dialog --title " Question " --nook --nocancel --inputbox \
+		"\nPlease input the size of the $bname in MB (max 2047):" 8 63 $1 2> $tempfile
+	size=`cat $tempfile`
+	[ 0$size -le 0 -o 0$size -gt 2047 ] && size=2047
+	( dd bs=1M count=$size if=/dev/zero | pv -ns ${size}m | dd of=$2 ) 2>&1 \
+		| progress_bar "Creating $bname" "Expect to write $size MB..."
+}
+
+create_data_img()
+{
+	dialog --title " Confirm " --yesno \
+		"\nThe installer is going to create a disk image to save the user data. At least 512MB free disk space is recommended.\n\nAre you sure to create the image?" 11 62
+
+	if [ $? -eq 0 ]; then
+		if create_img 512 data.img; then
+			losetup /dev/loop6 data.img
+			mke2fs -jL /data /dev/loop6 > /dev/tty6
+		fi
+	else
+		dialog --title " Warning " --msgbox \
+			"\nOK. So data will be save to a RAMDISK(tmpfs), and lose after power off." 8 49
+	fi
+}
+
+create_sdcard_img()
+{
+	case "$fs" in
+		vfat|fuseblk)
+			mkdir sd
+			sdcard=sd/sdcard.img
+			;;
+		*)
+			sdcard=data/sdcard.img
+			;;
+	esac
+
+	if create_img 2047 $sdcard; then
+		losetup /dev/loop7 $sdcard
+		newfs_msdos -L sdcard /dev/loop7 > /dev/tty7 2>&1
+	fi
+	sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
+	dialog --ok-label Reboot --msgbox "\n The fake SD card is created successfully." 7 47
+}
+
 install_to()
 {
 	mountpoint -q /hd && umount /hd
@@ -130,15 +183,6 @@ install_to()
 	done
 
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
-	if [ "$fs" = "vfat" ]; then
-		dialog --title " Warning " --yesno \
-			"\nYou are going to install Android-x86 to a fat32 partition. Though this is possible, android cannot save user data to that partition. So data will be save to a RAMDISK(tmpfs), and lose after power off.\n\nAre you sure to continue?" 12 63
-		[ $? -ne 0 ] && return 1
-	elif [ "$fs" = "fuseblk" ]; then
-		dialog --title " Warning " --yesno \
-			"\nYou are going to install Android-x86 to an NTFS partition. Though this is possible, some user data cannot be saved properly to that partition and will lose after power off.\n\nAre you sure to continue?" 11 63
-		[ $? -ne 0 ] && return 1
-	fi
 
 	asrc=android-$VER
 	dialog --title " Confirm " --no-label Skip --yesno \
@@ -159,7 +203,7 @@ install_to()
 		[ $? -ne 0 ] && return 255
 	fi
 
-	dialog --title " Question " --defaultno --yesno \
+	[ "$fs" != "vfat" ] && dialog --title " Question " --defaultno --yesno \
 		"\nDo you want to install /system directory as read-write?\n\nLet /system be read-write make it easier to debug, but it needs more disk space and longer installation time." 10 61
 	instal_rw=$?
 
@@ -181,7 +225,15 @@ install_to()
 	mv mnt/$SRC/* . && rm -rf mnt
 	[ -d android ] && mv android/* . && rmdir android
 
-	[ "$fs" != "vfat" ] && mkdir data
+	case "$fs" in
+		vfat|fuseblk)
+			create_data_img
+			;;
+		*)
+			mkdir data
+			;;
+	esac
+
 	sync
 
 	return $((`cat /tmp/result`*255))
@@ -219,8 +271,8 @@ do_install()
 
 	[ -n "$VESA" ] || runit="Run Android-x86"
 	dialog --clear --title ' Congratulations! ' \
-		--menu "\n Android-x86 is installed successfully.\n " 11 51 13 \
-		"$runit" "" "Reboot" "" 2> $tempfile
+		--menu "\n Android-x86 is installed successfully.\n " 12 51 13 \
+		"$runit" "" "Create a fake SD card" "" "Reboot" "" 2> $tempfile
 	case "`cat $tempfile`" in
 		Run*)
 			cd /android
@@ -232,7 +284,15 @@ do_install()
 			else
 				mount -o loop /hd/$asrc/system.img system
 			fi
-			[ -d /hd/$asrc/data ] && mount --bind /hd/$asrc/data data
+			if [ -d /hd/$asrc/data ]; then
+				mount --bind /hd/$asrc/data data
+			elif [ -e /hd/$asrc/data.img ]; then
+				mount -o loop /hd/$asrc/data.img data
+			fi
+			;;
+		Create*)
+			create_sdcard_img
+			rebooting
 			;;
 		*)
 			rebooting
