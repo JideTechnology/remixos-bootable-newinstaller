@@ -29,10 +29,12 @@ mount_sdcard()
 {
 	mountpoint -q sdcard && return
 	if [ -n "$SDCARD" -a -e /mnt/$SRC$SDCARD ]; then
-		remount_rw
-		sddir=`dirname $SDCARD`
-		mkdir /android$sddir
-		mount --bind /mnt/$SRC$sddir /android$sddir
+		if [ ! -e /android$SDCARD ]; then
+			remount_rw
+			sddir=`dirname $SDCARD`
+			mkdir /android$sddir
+			mount --bind /mnt/$SRC$sddir /android$sddir
+		fi
 	elif [ "$SDCARD" = "premount" ]; then
 	# WARNING: premount the sdcard is deprecated since froyo-x86.
 	# It is left only for backward compatibility and may be removed
