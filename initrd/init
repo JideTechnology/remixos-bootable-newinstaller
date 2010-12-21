@@ -1,7 +1,7 @@
 #!/bin/busybox sh
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/12/18
+# Last updated 2010/12/21
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -128,6 +128,7 @@ load_modules
 mount_data
 mount_sdcard
 setup_tslib
+post_detect
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
