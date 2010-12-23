@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/12/21
+# Last updated 2010/12/23
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -9,6 +9,8 @@
 
 tempfile=/tmp/temp-$$
 menufile=/tmp/menu-$$
+
+CPIO=/system/xbin/cpio
 
 rebooting()
 {
@@ -218,7 +220,7 @@ install_to()
 	mkdir hd/$asrc
 	cd hd/$asrc
 	rm -rf system*
-	( ( cd /; find $files | cpio -H newc -o ) | pv -ns ${size}k | ( cpio -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
+	( ( cd /; find $files | $CPIO -H newc -o ) | pv -ns ${size}k | ( $CPIO -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
 		| progress_bar "Installing Android-x86" "Expect to write $size KB..."
 
 	chmod 644 *
