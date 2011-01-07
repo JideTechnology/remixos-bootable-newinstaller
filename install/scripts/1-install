@@ -115,8 +115,8 @@ create_winitem()
 		dialog --title " Confirm " --yesno \
 			"\nThe installer found a Windows partition in /dev/$win.\n\nDo you want to create a boot item for Windows?" 9 59
 		[ $? -ne 0 ] && return 1
-		p=$((`echo $win | cut -b4-`-1))
-		echo -e "title Windows\n\trootnoverify (hd$d,$p)\n\tchainloader +1\n" >> $menulst
+		wp=$((`echo $win | cut -b4-`-1))
+		echo -e "title Windows\n\trootnoverify (hd$d,$wp)\n\tchainloader +1\n" >> $menulst
 	fi
 }
 
