@@ -106,13 +106,13 @@ while :; do
 	echo -n .
 done
 
+ln -s mnt/$SRC /src
 ln -s android/system /
-
 ln -s ../system/lib/modules /lib
 
 if [ -n "$INSTALL" ]; then
 	cd /
-	zcat /mnt/$SRC/install.img | cpio -iud > /dev/null
+	zcat /src/install.img | cpio -iud > /dev/null
 fi
 
 if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
@@ -131,7 +131,7 @@ if [ -n "$DEBUG" ]; then
 fi
 
 # load scripts
-for s in `ls /scripts/* /mnt/$SRC/scripts/*`; do
+for s in `ls /scripts/* /src/scripts/*`; do
 	test -e "$s" && source $s
 done
 
