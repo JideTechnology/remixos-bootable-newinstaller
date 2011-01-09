@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/12/23
+# Last updated 2011/01/09
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -147,6 +147,7 @@ create_data_img()
 			losetup /dev/loop6 data.img
 			mke2fs -jL /data /dev/loop6 > /dev/tty6
 		fi
+		[ $? -ne 0 ] && dialog --msgbox "\n Failed to create data.img." 7 33
 	else
 		dialog --title " Warning " --msgbox \
 			"\nOK. So data will be save to a RAMDISK(tmpfs), and lose after power off." 8 49
@@ -169,9 +170,14 @@ create_sdcard_img()
 		losetup /dev/loop7 $sdcard
 		newfs_msdos -L sdcard /dev/loop7 > /dev/tty7 2>&1
 	fi
+	if [ $? -eq 0 ]; then
+		sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
+		msg="The fake SD card is created successfully"
+	else
+		msg="Failed to create a fake SD card"
+	fi
 	cd /
-	sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
-	dialog --ok-label Reboot --msgbox "\n The fake SD card is created successfully." 7 47
+	dialog --ok-label Reboot --msgbox "\n $msg." 7 47
 }
 
 install_to()
@@ -222,24 +228,27 @@ install_to()
 	rm -rf system*
 	( ( cd /; find $files | $CPIO -H newc -o ) | pv -ns ${size}k | ( $CPIO -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
 		| progress_bar "Installing Android-x86" "Expect to write $size KB..."
+	result=$((`cat /tmp/result`*255))
 
-	chmod 644 *
-	chown 0.0 *
-	mv mnt/$SRC/* . && rm -rf mnt
-	[ -d android ] && mv android/* . && rmdir android
+	if [ $result -eq 0 ]; then
+		chmod 644 *
+		chown 0.0 *
+		mv mnt/$SRC/* . && rm -rf mnt
+		[ -d android ] && mv android/* . && rmdir android
 
-	case "$fs" in
-		vfat|fuseblk)
-			create_data_img
-			;;
-		*)
-			mkdir data
-			;;
-	esac
+		case "$fs" in
+			vfat|fuseblk)
+				create_data_img
+				;;
+			*)
+				mkdir data
+				;;
+		esac
+	fi
 
 	sync
 
-	return $((`cat /tmp/result`*255))
+	return $result
 }
 
 install_hd()
@@ -267,7 +276,7 @@ do_install()
 	until install_hd; do
 		if [ $retval -eq 255 ]; then
 			dialog --title ' Error! ' --yes-label Retry --no-label Reboot \
-				--yesno '\n      Installation failed!' 7 35
+				--yesno '\nInstallation failed! Please check if you have enough free disk space to install Android-x86.' 8 51
 			[ $? -eq 1 ] && rebooting
 		fi
 	done
