@@ -124,7 +124,7 @@ create_img()
 {
 	bname=`basename $2`
 	if [ -e $2 ]; then
-		dialog --title " Confirm " --yesno \
+		dialog --title " Confirm " --defaultno --yesno \
 			"\n $bname exists. Overwrite it?" 7 38
 		[ $? -ne 0 ] && return 255
 		rm -f $2
