@@ -12,6 +12,7 @@ LOCAL_C_INCLUDES := system/core/include/diskconfig
 LOCAL_CFLAGS := -O2 -g -W -Wall -Werror
 
 LOCAL_MODULE := editdisklbl
+LOCAL_MODULE_TAGS := optional
 LOCAL_STATIC_LIBRARIES := libdiskconfig_host libcutils liblog
 
 include $(BUILD_HOST_EXECUTABLE)
