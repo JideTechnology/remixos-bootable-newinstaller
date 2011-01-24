@@ -22,7 +22,8 @@ auto_detect()
 		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)modprobe \2;;/p' >> $tmp
 	echo 'esac; done; }' >> $tmp
 	source $tmp
-	find /sys -name modalias -exec cat {} \; | dev2mod
+	cat /sys/bus/*/devices/*/modalias | dev2mod
+	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
 }
 
 load_uvesafb()
