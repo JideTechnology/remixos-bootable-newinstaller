@@ -53,7 +53,6 @@ load_modules()
 		modprobe $m
 	done
 
-	mdev -s
 	[ -c /dev/video0 ] || modprobe vivi
 	[ -d /proc/asound/card0 ] || modprobe snd-dummy
 	load_uvesafb

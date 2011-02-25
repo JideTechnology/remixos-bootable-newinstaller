@@ -253,7 +253,6 @@ install_to()
 
 install_hd()
 {
-	mdev -s
 	select_dev || rebooting
 	retval=1
 	case "$choice" in

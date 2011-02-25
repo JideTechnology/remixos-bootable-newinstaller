@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2011/01/01
+# Last updated 2011/02/25
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -40,6 +40,7 @@ if test x"$HAS_CTTY" != x"Yes"; then
 		echo 0 0 0 0 > /proc/sys/kernel/printk
 	fi
 	# initialise /dev (first time)
+	echo /sbin/mdev > /proc/sys/kernel/hotplug
 	mdev -s
 	# re-run this script with a controlling tty
 	exec env HAS_CTTY=Yes setsid cttyhack /bin/sh "$0" "$@"
@@ -74,8 +75,6 @@ debug_shell()
 echo -n Detecting Android-x86...
 
 while :; do
-	mdev -s
-
 	for device in /dev/sr* /dev/sd[a-z]*; do
 		try_mount ro $device /mnt || continue
 		cd /mnt/$SRC
@@ -109,6 +108,7 @@ done
 ln -s mnt/$SRC /src
 ln -s android/system /
 ln -s ../system/lib/modules /lib
+ln -s ../system/lib/firmware /lib
 
 if [ -n "$INSTALL" ]; then
 	cd /
@@ -161,10 +161,14 @@ if [ -n "$DEBUG" ]; then
 	echo -e "Type 'exit' to enter Android...\n"
 
 	debug_shell debug-late
-	exec chroot /android /init
-else
-	exec switch_root /android /init
+	SWITCH=chroot
 fi
+
+# We must disable mdev before switching to Android
+# since it conflicts with Android's init
+echo > /proc/sys/kernel/hotplug
+
+exec ${SWITCH:-switch_root} /android /init
 
 # avoid kernel panic
 while :; do

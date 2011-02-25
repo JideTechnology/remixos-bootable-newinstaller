@@ -14,7 +14,6 @@ setup_tslib()
 				cp $pointercal $TSLIBPATH/pointercal
 			elif [ -e system/etc/ts.env ]; then
 				ln -s android/data /
-				mdev -s
 				mkdir /dev/graphics /dev/input
 				ln -s /dev/fb* /dev/graphics
 				ln -s /dev/event* /dev/input
