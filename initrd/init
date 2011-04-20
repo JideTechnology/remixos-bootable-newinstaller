@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2011/02/25
+# Last updated 2011/04/15
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -48,6 +48,12 @@ fi
 
 # now running under a controlling tty; debug output from stderr into log file
 # boot up Android
+
+error()
+{
+	echo $*
+	return 1
+}
 
 try_mount()
 {

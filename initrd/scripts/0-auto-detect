@@ -1,17 +1,11 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2009/12/10
+# Last updated 2011/04/20
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
 # with Android-x86 project.
 #
-
-error()
-{
-	echo $*
-	return 1
-}
 
 # An auto detect function provided by kinneko
 auto_detect()
@@ -28,6 +22,7 @@ auto_detect()
 
 load_uvesafb()
 {
+	[ -x /sbin/v86d ] || ln -s ../android/sbin/v86d /sbin
 	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
 	[ -c /dev/card0 ] || export HWACCEL=0
 }
