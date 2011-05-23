@@ -171,7 +171,7 @@ create_sdcard_img()
 		newfs_msdos -L sdcard /dev/loop7 > /dev/tty7 2>&1
 	fi
 	if [ $? -eq 0 ]; then
-		sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
+		[ -n "menulst" ] && sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
 		msg="The fake SD card is created successfully"
 	else
 		msg="Failed to create a fake SD card"
