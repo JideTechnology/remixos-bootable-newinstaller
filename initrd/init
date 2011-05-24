@@ -131,6 +131,9 @@ if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
 	ln -s android/sbin /
 fi
 
+# ensure keyboard driver is loaded
+[ -n "$INSTALL" -o -n "$DEBUG" ] && modprobe atkbd
+
 if [ -n "$DEBUG" ]; then
 	echo -e "\nType 'exit' to continue booting...\n"
 	debug_shell debug-found
