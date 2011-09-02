@@ -123,7 +123,7 @@ if [ -n "$INSTALL" ]; then
 	zcat /src/install.img | cpio -iud > /dev/null
 fi
 
-if [ -n "$DEBUG" -o -n "$BUSYBOX" ]; then
+if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	mv /bin /lib .
 	system/bin/ln -s android/lib /lib
 	system/bin/ln -s android/bin /bin
