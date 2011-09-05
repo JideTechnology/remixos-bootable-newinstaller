@@ -35,8 +35,8 @@ find_network_dev_name()
 	sed -i -e "$rmline,\$d" init.rc
 	for netdev in `ls /sys/class/net`; do
 		if [ "$netdev" != "lo" -a "$netdev" != "wmaster0" ]; then
-			echo -e "service dhcpcd_$netdev $DHCPCD -ABKL\n   disabled\n   oneshot\n" >> init.rc
-			echo -e "service iprenew_$netdev $DHCPCD -n\n   disabled\n   oneshot\n" >> init.rc
+			echo -e "\nservice dhcpcd_$netdev $DHCPCD -ABKL\n    class main\n    disabled\n    oneshot\n" >> init.rc
+			echo -e "service iprenew_$netdev $DHCPCD -n\n    class main\n    disabled\n    oneshot" >> init.rc
 		fi
 	done
 }
