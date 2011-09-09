@@ -105,7 +105,7 @@ echo -n Detecting Android-x86...
 mount -t tmpfs tmpfs /android
 cd /android
 while :; do
-	for device in /dev/sr* /dev/[hs]d[a-z]*; do
+	for device in ${ROOT:-/dev/sr* /dev/[hs]d[a-z]*}; do
 		check_root $device && break 2
 		mountpoint -q /mnt && umount /mnt
 	done
