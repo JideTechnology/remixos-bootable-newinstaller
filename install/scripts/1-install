@@ -96,12 +96,7 @@ create_menulst()
 	echo -e "default=0\ntimeout=6\nroot (hd0,$1)\nsplashimage=/grub/android-x86.xpm.gz\n" > $menulst
 	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE.*\)||"`
 
-	if grep -q ^ro.sf.lcd_density /android/default.prop /android/system/build.prop; then
-		create_entry "Android-x86 $VER" quiet $cmdline
-	else
-		create_entry "Android-x86 $VER (HDPI)" quiet $cmdline DPI=240
-		create_entry "Android-x86 $VER (MDPI)" quiet $cmdline DPI=160
-	fi
+	create_entry "Android-x86 $VER" quiet $cmdline
 	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=1
 }
 
