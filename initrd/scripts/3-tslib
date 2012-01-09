@@ -19,8 +19,8 @@ setup_tslib()
 				ln -s /dev/event* /dev/input
 				ts_calibrate > /tmp/cal.log
 			fi
-			chmod 666 $TSLIBPATH/pointercal
-			chown -R 1000.1000 data
+			chmod 664 $TSLIBPATH/pointercal
+			chown 1000.1000 data data/system $TSLIBPATH
 		fi
 	fi
 }
