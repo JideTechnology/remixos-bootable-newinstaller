@@ -1,10 +1,17 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/10/14
+# Last updated 2012/02/08
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
 # with Android-x86 project.
 #
 
-[ -n "$DPI" ] && echo ro.sf.lcd_density=$DPI >> default.prop
+setup_dpi()
+{
+	if [ -n "$DPI" ]; then
+		grep -v ro.sf.lcd_density default.prop > tmp.prop
+		echo ro.sf.lcd_density=$DPI >> tmp.prop
+		mv tmp.prop default.prop
+	fi
+}

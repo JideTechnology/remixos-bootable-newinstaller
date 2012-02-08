@@ -165,6 +165,7 @@ load_modules
 mount_data
 mount_sdcard
 setup_tslib
+setup_dpi
 post_detect
 
 if [ -n "$DEBUG" ]; then
