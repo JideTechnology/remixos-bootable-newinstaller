@@ -92,6 +92,7 @@ $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG)
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
 		-input-charset utf-8 -V "Android-x86 LiveCD" -o $@ $^
 	$(hide) isohybrid $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
+	@echo -e "\n\n$@ is built successfully.\n\n"
 
 ANDROID_SRC := /android-system
 USB_BOOT := $(PRODUCT_OUT)/usb_boot
