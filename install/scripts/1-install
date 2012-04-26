@@ -93,7 +93,7 @@ create_menulst()
 {
 	menulst=/hd/grub/menu.lst
 	[ -n "$VESA" ] && vga=" vga=788 modeset=0"
-	echo -e "default=0\ntimeout=6\nroot (hd0,$1)\nsplashimage=/grub/android-x86.xpm.gz\n" > $menulst
+	echo -e "${GRUB_OPTIONS:-default=0\ntimeout=6\nsplashimage=/grub/android-x86.xpm.gz\n}root (hd0,$1)\n" > $menulst
 	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE.*\)||"`
 
 	create_entry "Android-x86 $VER" quiet $cmdline
