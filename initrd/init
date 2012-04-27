@@ -58,6 +58,10 @@ error()
 try_mount()
 {
 	RW=$1; shift
+	if [ "${ROOT#*:/}" != "$ROOT" ]; then
+		# for NFS roots, use nolock to avoid dependency to portmapper
+		RW="nolock,$RW"
+	fi
 	# FIXME: any way to mount ntfs gracefully?
 	mount -o $RW $@ || mount.ntfs-3g -o rw,force $@
 }
@@ -86,7 +90,9 @@ check_root()
 
 remount_rw()
 {
-	mount -o remount,rw /mnt
+	# "foo" as mount source is given to workaround a Busybox bug with NFS
+	# - as it's ignored anyways it shouldn't harm for other filesystems.
+	mount -o remount,rw foo /mnt
 }
 
 debug_shell()
