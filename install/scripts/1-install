@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2011/01/09
+# Last updated 2012/07/07
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -149,32 +149,6 @@ create_data_img()
 	fi
 }
 
-create_sdcard_img()
-{
-	case "$fs" in
-		vfat|fuseblk)
-			mkdir sd
-			sdcard=sd/sdcard.img
-			;;
-		*)
-			sdcard=data/sdcard.img
-			;;
-	esac
-
-	if create_img 2047 $sdcard; then
-		losetup /dev/loop7 $sdcard
-		newfs_msdos -L sdcard /dev/loop7 > /dev/tty7 2>&1
-	fi
-	if [ $? -eq 0 ]; then
-		[ -n "menulst" ] && sed -i "s|\(SDCARD=\S\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)|\1 SDCARD=/$sdcard|" $menulst
-		msg="The fake SD card is created successfully"
-	else
-		msg="Failed to create a fake SD card"
-	fi
-	cd /
-	dialog --ok-label Reboot --msgbox "\n $msg." 7 47
-}
-
 install_to()
 {
 	cd /
@@ -277,8 +251,8 @@ do_install()
 
 	[ -n "$VESA" ] || runit="Run Android-x86"
 	dialog --clear --title ' Congratulations! ' \
-		--menu "\n Android-x86 is installed successfully.\n " 12 51 13 \
-		"$runit" "" "Create a fake SD card" "" "Reboot" "" 2> $tempfile
+		--menu "\n Android-x86 is installed successfully.\n " 11 51 13 \
+		"$runit" "" "Reboot" "" 2> $tempfile
 	case "`cat $tempfile`" in
 		Run*)
 			cd /android
@@ -295,10 +269,6 @@ do_install()
 			elif [ -e /hd/$asrc/data.img ]; then
 				mount -o loop /hd/$asrc/data.img data
 			fi
-			;;
-		Create*)
-			create_sdcard_img
-			rebooting
 			;;
 		*)
 			rebooting
