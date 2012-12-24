@@ -154,15 +154,7 @@ done
 
 # A target should provide its detect_hardware function.
 # On success, return 0 with the following values set.
-#
-# FB0DEV: framebuffer driver
-# LANDEV: lan driver
-# WIFDEV: wifi driver
-# SNDDEV: sound driver
-# CAMDEV: camera driver
-# PREDEV: any module the drivers depend on but can't be loaded automatically
-# EXTMOD: any other module
-
+# return 1 if it wants to use auto_detect
 [ "$AUTO" != "1" ] && detect_hardware && FOUND=1
 
 [ -n "$INSTALL" ] && do_install
@@ -173,6 +165,7 @@ mount_sdcard
 setup_tslib
 setup_dpi
 post_detect
+find_network_dev_name
 
 if [ -n "$DEBUG" ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"

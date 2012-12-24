@@ -37,15 +37,20 @@ load_uvesafb()
 
 find_network_dev_name()
 {
+	INITRC=init.rc
 	DHCPCD="/system/bin/dhcpcd -o domain_name_servers"
-	rmline=`grep -n "#REMOVE FROM HERE" init.rc|cut -d':' -f1`
+	rmline=`grep -n "#REMOVE FROM HERE" $INITRC | cut -d':' -f1`
 	rmline=`expr $rmline + 1`
-	sed -i -e "$rmline,\$d" init.rc
+	sed -i -e "$rmline,\$d" $INITRC
 	for netdev in `ls /sys/class/net`; do
-		if [ "$netdev" != "lo" -a "$netdev" != "wmaster0" ]; then
-			echo -e "\nservice dhcpcd_$netdev $DHCPCD -ABKL\n    class main\n    disabled\n    oneshot\n" >> init.rc
-			echo -e "service iprenew_$netdev $DHCPCD -n\n    class main\n    disabled\n    oneshot" >> init.rc
-		fi
+		case "$netdev" in
+			lo|ip6tnl*|sit*|tun*|eth0|wlan0|wmaster*)
+				;;
+			*)
+				echo -e "\nservice dhcpcd_$netdev $DHCPCD -ABDKL\n    class main\n    disabled\n    oneshot\n" >> $INITRC
+				echo -e "service iprenew_$netdev $DHCPCD -n\n    class main\n    disabled\n    oneshot" >> $INITRC
+				;;
+		esac
 	done
 }
 
@@ -73,6 +78,4 @@ load_modules()
 	[ -c /dev/video0 ] || modprobe vivi
 	[ -d /proc/asound/card0 ] || modprobe snd-dummy
 	load_uvesafb
-
-	find_network_dev_name
 }
