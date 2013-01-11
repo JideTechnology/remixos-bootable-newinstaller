@@ -164,7 +164,7 @@ install_to()
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
 
 	asrc=android-$VER
-	dialog --title " Confirm " --no-label Skip --yesno \
+	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install boot loader GRUB?" 7 47
 	if [ $? -eq 0 ]; then
 		cp -af /grub /hd
@@ -182,7 +182,7 @@ install_to()
 		[ $? -ne 0 ] && return 255
 	fi
 
-	[ "$fs" != "vfat" ] && dialog --title " Question " --defaultno --yesno \
+	[ "$fs" != "vfat" ] && dialog --title " Question " --yesno \
 		"\nDo you want to install /system directory as read-write?\n\nLet /system be read-write make it easier to debug, but it needs more disk space and longer installation time." 10 61
 	instal_rw=$?
 
