@@ -11,4 +11,5 @@ do_install()
 {
 	error -e '\n  Android-x86 installer is not available.\n  Press RETURN to run live version.\n'
 	read
+	cd /android
 }
