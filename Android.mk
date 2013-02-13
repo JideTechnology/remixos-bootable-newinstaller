@@ -71,7 +71,7 @@ $(INITRD_RAMDISK): $(initrd_bin) $(systemimg) $(TARGET_INITRD_SCRIPTS) | $(ACP) 
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
 
 INSTALL_RAMDISK := $(PRODUCT_OUT)/install.img
-$(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/*) | $(MKBOOTFS)
+$(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/*) | $(MKBOOTFS) $(TARGET_OUT_OPTIONAL_EXECUTABLES)/busybox
 	$(if $(TARGET_INSTALL_SCRIPTS),$(ACP) -p $(TARGET_INSTALL_SCRIPTS) $(TARGET_INSTALLER_OUT)/scripts)
 	$(MKBOOTFS) $(dir $(dir $(<D))) | gzip -9 > $@
 
