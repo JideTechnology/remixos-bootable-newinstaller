@@ -94,36 +94,8 @@ $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG)
 	$(hide) isohybrid $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
 	@echo -e "\n\n$@ is built successfully.\n\n"
 
-ANDROID_SRC := /android-system
-USB_BOOT := $(PRODUCT_OUT)/usb_boot
-
-usb_tmp_img := $(PRODUCT_OUT)/usb_tmp.img
-$(usb_tmp_img): $(wildcard $(LOCAL_PATH)/usb/*) $(BUILT_IMG) | $(ACP) $(MKEXT2IMG)
-	rm -rf $(USB_BOOT)
-	mkdir -p $(USB_BOOT)$(ANDROID_SRC)
-	touch $(USB_BOOT)/ramdisk
-	echo 1 > $(USB_BOOT)/cmdline
-	ln $(BUILT_IMG) $(USB_BOOT)$(ANDROID_SRC)
-	$(ACP) -fp $(<D)/* $(<D)/../install/grub/android-x86.xpm.gz $(USB_BOOT)
-	ln -s grub4dos $(USB_BOOT)/kernel
-	$(hide) $(call check-density,$(USB_BOOT)/menu.lst)
-	$(hide) sed -i "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(USB_BOOT)/menu.lst
-	num_blocks=`du -sk $(USB_BOOT) | tail -n1 | awk '{print $$1;}'`; \
-	num_inodes=`find $(USB_BOOT) | wc -l`; \
-	$(MKEXT2IMG) -d $(USB_BOOT) -b `expr $$num_blocks + 20480` -N `expr $$num_inodes + 15` -m 0 $@
-
-edit_mbr := $(HOST_OUT_EXECUTABLES)/editdisklbl
-USB_LAYOUT := $(LOCAL_PATH)/usb_layout.conf
-USB_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)_usb.img
-$(USB_IMAGE): $(usb_tmp_img) $(USB_LAYOUT) $(PRODUCT_OUT)/grub/grub.bin | $(edit_mbr)
-	@echo ----- Making usb image ------
-	@sed 's|default 2|default 0|' $(PRODUCT_OUT)/grub/grub.bin > $@
-	@$(edit_mbr) -l $(USB_LAYOUT) -i $@ usb_boot=$(usb_tmp_img)
-
 .PHONY: iso_img usb_img
 iso_img: $(ISO_IMAGE)
-usb_img: $(USB_IMAGE)
-
-include $(call first-makefiles-under,$(LOCAL_PATH))
+usb_img: $(ISO_IMAGE)
 
 endif
