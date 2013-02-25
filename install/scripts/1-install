@@ -97,7 +97,7 @@ create_menulst()
 	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE.*\)||"`
 
 	create_entry "Android-x86 $VER" quiet $cmdline
-	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=1
+	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=2
 }
 
 create_winitem()

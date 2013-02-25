@@ -36,7 +36,8 @@ if test x"$HAS_CTTY" != x"Yes"; then
 		# create device nodes then spawn on them
 		mknod /dev/tty2 c 4 2 && openvt
 		mknod /dev/tty3 c 4 3 && openvt
-	else
+	fi
+	if test -z "$DEBUG" || test -n "$INSTALL"; then
 		echo 0 0 0 0 > /proc/sys/kernel/printk
 	fi
 	# initialise /dev (first time)
@@ -142,7 +143,7 @@ fi
 # ensure keyboard driver is loaded
 [ -n "$INSTALL" -o -n "$DEBUG" ] && modprobe atkbd
 
-if [ -n "$DEBUG" ]; then
+if [ 0$DEBUG -gt 0 ]; then
 	echo -e "\nType 'exit' to continue booting...\n"
 	debug_shell debug-found
 fi
@@ -167,13 +168,14 @@ setup_dpi
 post_detect
 find_network_dev_name
 
-if [ -n "$DEBUG" ]; then
+if [ 0$DEBUG -gt 1 ]; then
 	echo -e "\nUse Alt-F1/F2/F3 to switch between virtual consoles"
 	echo -e "Type 'exit' to enter Android...\n"
 
 	debug_shell debug-late
-	SWITCH=chroot
 fi
+
+[ -n "$DEBUG" ] && SWITCH=${SWITCH:-chroot}
 
 # We must disable mdev before switching to Android
 # since it conflicts with Android's init
