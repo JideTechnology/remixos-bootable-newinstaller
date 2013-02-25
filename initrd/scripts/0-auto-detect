@@ -37,7 +37,7 @@ load_uvesafb()
 
 find_network_dev_name()
 {
-	INITRC=init.rc
+	INITRC=init.x86.rc
 	DHCPCD="/system/bin/dhcpcd -o domain_name_servers"
 	rmline=`grep -n "#REMOVE FROM HERE" $INITRC | cut -d':' -f1`
 	rmline=`expr $rmline + 1`
