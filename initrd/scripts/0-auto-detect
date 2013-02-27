@@ -24,15 +24,6 @@ load_uvesafb()
 {
 	[ -x /sbin/v86d ] || ln -s ../android/sbin/v86d /sbin
 	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
-	if [ -z "$HWACCEL" ]; then
-		case "`cat /proc/fb`" in
-			*inteldrmfb|*radeondrmfb)
-				;;
-			*)
-				export HWACCEL=0
-				;;
-		esac
-	fi
 }
 
 find_network_dev_name()
@@ -68,14 +59,10 @@ load_modules()
 	fi
 
 	# bluetooth modules
-	EXTMOD="$EXTMOD bnep rfcomm sco btusb"
+	EXTMOD="$EXTMOD bnep rfcomm sco"
 	# 3G modules
-	EXTMOD="$EXTMOD cdc-acm option pppoe ppp-async ppp-deflate bsd-comp"
+	EXTMOD="$EXTMOD pppoe ppp-async ppp-deflate bsd-comp"
 	for m in $EXTMOD; do
 		modprobe $m
 	done
-
-	[ -c /dev/video0 ] || modprobe vivi
-	[ -d /proc/asound/card0 ] || modprobe snd-dummy
-	load_uvesafb
 }

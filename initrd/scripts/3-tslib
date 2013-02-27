@@ -1,7 +1,23 @@
 setup_tslib()
 {
+	# FIXME: this should be moved to android init script once
+	# I can find a way to run ts_calibrate inside android init
+	case "`cat /sys/class/dmi/id/product_name`" in
+		ET2002*)
+			UVESA_MODE=${UVESA_MODE:-1600x900}
+			BOARD_USES_TSLIB=true
+			;;
+		T91|T101)
+			UVESA_MODE=${UVESA_MODE:-1024x600}
+			BOARD_USES_TSLIB=true
+			;;
+		*)
+			;;
+	esac
+
 	# setup for pointercal
 	if [ -n "$BOARD_USES_TSLIB" ]; then
+		[ -n "$UVESA_MODE" ] && load_uvesafb
 		TSLIBPATH=data/system/tslib
 		if [ ! -e $TSLIBPATH/pointercal ]; then
 			mkdir -p $TSLIBPATH
