@@ -58,8 +58,6 @@ load_modules()
 		auto_detect
 	fi
 
-	# bluetooth modules
-	EXTMOD="$EXTMOD bnep rfcomm sco"
 	# 3G modules
 	EXTMOD="$EXTMOD pppoe ppp-async ppp-deflate bsd-comp"
 	for m in $EXTMOD; do
