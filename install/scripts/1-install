@@ -184,8 +184,8 @@ install_to()
 		[ $? -ne 0 ] && return 255
 	fi
 
-	[ "$fs" != "vfat" ] && dialog --title " Question " --yesno \
-		"\nDo you want to install /system directory as read-write?\n\nLet /system be read-write make it easier to debug, but it needs more disk space and longer installation time." 10 61
+	[ "$fs" != "vfat" -a "$fs" != "fuseblk" ] && dialog --title " Question " --yesno \
+		"\nDo you want to install /system directory as read-write?\n\nMaking /system be read-write is easier for debugging, but it needs more disk space and longer installation time." 10 61
 	instal_rw=$?
 
 	files="mnt/$SRC/kernel mnt/$SRC/initrd.img mnt/$SRC/ramdisk.img"
