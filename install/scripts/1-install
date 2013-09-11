@@ -29,6 +29,44 @@ choose()
 	choice=`cat $tempfile`
 }
 
+partition_drive()
+{
+	echo -n > $menufile
+	for i in /sys/block/[sh]d[a-z]; do
+		echo -n `basename $i` >> $menufile
+		if [ -f $i/removable -a `cat $i/removable` -eq 0 ]; then
+			echo -n ' "Harddisk ' >> $menufile
+		else
+			echo -n ' "Removable' >> $menufile
+		fi
+		if [ -f $i/size ]; then
+			echo -n " (" `cat $i/size` "blocks)" >> $menufile
+		fi
+		echo '"' >> $menufile
+	done
+	count=`wc -l $menufile | awk '{ print $1 }'`
+	if [ $count -eq 0 ]; then
+		dialog --title " Error " --msgbox \
+			"\nOK. There is no hard drive to edit partitions." 8 49
+		return 255
+	fi
+	if [ $count -eq 1 ]; then
+		choice=`awk '{ print $1 }' $menufile`
+		retval=0
+	else
+		choose "Choose Drive" "Please select a drive to edit partitions:"
+	fi
+	if [ $retval -eq 0 ]; then
+		cfdisk /dev/$choice
+		if [ $? -eq 0 ]; then
+			retval=1
+		else
+			retval=255
+		fi
+	fi
+	return $retval
+}
+
 select_dev()
 {
 	fdisk -l | grep ^/dev | cut -b6-12,55- | awk '{
@@ -232,7 +270,8 @@ install_hd()
 			retval=$?
 			;;
 		Create*)
-			cfdisk
+			partition_drive
+			retval=$?
 			;;
 		Detect*)
 			dialog --title " Detecting... " --nocancel --pause "" 8 41 1
