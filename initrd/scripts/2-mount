@@ -10,10 +10,10 @@
 mount_data()
 {
 	mountpoint -q data && return
-	if [ -b "$DATA" ]; then
-		mount $DATA data
-	elif [ -b "/dev/$DATA" ]; then
-		mount /dev/$DATA data
+	blk=`basename $DATA`
+	if [ -b "/dev/$blk" ]; then
+		[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+		mount /dev/block/$blk data
 	elif [ -d /mnt/$SRC/data ]; then
 		remount_rw
 		mount --bind /mnt/$SRC/data data

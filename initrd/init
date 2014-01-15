@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2011/08/18
+# Last updated 2014/01/15
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -41,6 +41,7 @@ if test x"$HAS_CTTY" != x"Yes"; then
 		echo 0 0 0 0 > /proc/sys/kernel/printk
 	fi
 	# initialise /dev (first time)
+	mkdir -p /dev/block
 	echo /sbin/mdev > /proc/sys/kernel/hotplug
 	mdev -s
 	# re-run this script with a controlling tty
@@ -69,7 +70,15 @@ try_mount()
 
 check_root()
 {
-	try_mount ro $1 /mnt && [ -e /mnt/$SRC/ramdisk.img ]
+	if [ "`dirname $1`" = "/dev" ]; then
+		[ -e $1 ] || return 1
+		blk=`basename $1`
+		[ ! -e /dev/block/$blk ] && ln $1 /dev/block
+		dev=/dev/block/$blk
+	else
+		dev=$1
+	fi
+	try_mount ro $dev /mnt && [ -e /mnt/$SRC/ramdisk.img ]
 	[ $? -ne 0 ] && return 1
 	zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
 	if [ -e /mnt/$SRC/system.sfs ]; then
@@ -112,7 +121,7 @@ echo -n Detecting Android-x86...
 mount -t tmpfs tmpfs /android
 cd /android
 while :; do
-	for device in ${ROOT:-/dev/sr* /dev/[hs]d[a-z]*}; do
+	for device in ${ROOT:-/dev/sr* /dev/[hs]d[a-z]* /dev/mmcblk*}; do
 		check_root $device && break 2
 		mountpoint -q /mnt && umount /mnt
 	done
