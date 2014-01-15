@@ -10,7 +10,7 @@
 tempfile=/tmp/temp-$$
 menufile=/tmp/menu-$$
 
-CPIO=/system/xbin/cpio
+CPIO=cpio
 
 rebooting()
 {
@@ -232,7 +232,7 @@ install_to()
 	for s in `du -sk $files | awk '{print $1}'`; do
 		size=$(($size+$s))
 	done
-	mkdir hd/$asrc
+	mkdir -p hd/$asrc
 	cd hd/$asrc
 	rm -rf system*
 	( ( cd /; find $files | $CPIO -H newc -o ) | pv -ns ${size}k | ( $CPIO -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
@@ -250,7 +250,7 @@ install_to()
 				create_data_img
 				;;
 			*)
-				mkdir data
+				mkdir -p data
 				;;
 		esac
 	fi

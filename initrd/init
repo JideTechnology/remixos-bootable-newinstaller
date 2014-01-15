@@ -10,7 +10,7 @@
 # with Android-x86 project.
 #
 
-PATH=/sbin:/bin:/system/bin:/system/xbin; export PATH
+PATH=/sbin:/bin; export PATH
 
 # configure debugging output
 if [ -n "$DEBUG" ]; then
@@ -137,16 +137,6 @@ ln -s ../system/lib/firmware /lib
 if [ -n "$INSTALL" ]; then
 	cd /
 	zcat /src/install.img | cpio -iud > /dev/null
-fi
-
-if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
-	mv /bin /lib .
-	system/bin/ln -s android/lib /lib
-	system/bin/ln -s android/bin /bin
-	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|' init.rc
-	mv /sbin/* sbin
-	rmdir /sbin
-	ln -s android/sbin /
 fi
 
 # ensure keyboard driver is loaded
