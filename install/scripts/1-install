@@ -189,6 +189,25 @@ create_data_img()
 	fi
 }
 
+try_upgrade()
+{
+	[ -d $1 ] && return
+	PREV_VERS="4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	for v in $PREV_VERS; do
+		prev=hd/android-$v
+		if [ -d $prev ]; then
+			dialog --title " Question " --yesno \
+				"\nAn older Android-x86 version $v is detected.\nWould you like to upgrade it?" 8 55
+			if [ $? -eq 0 ]; then
+				mv $prev $1
+				rm -rf $1/data/dalvik-cache/* $1/data/system/wpa_supplicant
+				sed -i 's/\(ctrl_interface=\)\(.*\)/\1wlan0/' $1/data/misc/wifi/wpa_supplicant.conf
+				break
+			fi
+		fi
+	done
+}
+
 install_to()
 {
 	cd /
@@ -232,6 +251,7 @@ install_to()
 	for s in `du -sk $files | awk '{print $1}'`; do
 		size=$(($size+$s))
 	done
+	try_upgrade hd/$asrc
 	mkdir -p hd/$asrc
 	cd hd/$asrc
 	rm -rf system*
