@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2010/12/19
+# Last updated 2014/04/09
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -10,7 +10,7 @@
 mount_data()
 {
 	mountpoint -q data && return
-	blk=`basename $DATA`
+	[ -n "$DATA" ] && blk=`basename $DATA` || blk=
 	if [ -b "/dev/$blk" ]; then
 		[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
 		mount /dev/block/$blk data
