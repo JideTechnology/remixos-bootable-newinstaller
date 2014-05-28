@@ -93,7 +93,7 @@ check_root()
 		rm -rf *
 		return 1
 	fi
-	mkdir cache mnt mnt/sdcard
+	mkdir cache mnt
 	mount -t tmpfs tmpfs cache
 	echo " found at $1"
 }
