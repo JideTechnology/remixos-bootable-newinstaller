@@ -119,6 +119,8 @@ debug_shell()
 
 echo -n Detecting Android-x86...
 
+[ -z "$SRC" -a -n "$BOOT_IMAGE" ] && SRC=`dirname $BOOT_IMAGE`
+
 mount -t tmpfs tmpfs /android
 cd /android
 while :; do
