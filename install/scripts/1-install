@@ -192,7 +192,7 @@ create_data_img()
 try_upgrade()
 {
 	[ -d $1 ] && return
-	PREV_VERS="4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	PREV_VERS="4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
 	for v in $PREV_VERS; do
 		prev=hd/android-$v
 		if [ -d $prev ]; then
