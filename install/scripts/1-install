@@ -33,6 +33,9 @@ partition_drive()
 {
 	echo -n > $menufile
 	for i in /sys/block/[sh]d[a-z]; do
+		if [ ! -d $i ]; then  # pathname expansion failed
+			continue
+		fi
 		echo -n `basename $i` >> $menufile
 		if [ -f $i/removable -a `cat $i/removable` -eq 0 ]; then
 			echo -n ' "Harddisk ' >> $menufile
