@@ -32,7 +32,7 @@ choose()
 partition_drive()
 {
 	echo -n > $menufile
-	for i in /sys/block/[sh]d[a-z]; do
+	for i in /sys/block/[shv]d[a-z]; do
 		if [ ! -d $i ]; then  # pathname expansion failed
 			continue
 		fi
@@ -233,7 +233,7 @@ install_to()
 		d=0
 		while [ 1 ]; do
 			h=`echo $d | awk '{ printf("%c", $1+97) }'`
-			[ -d /sys/block/[sh]d$h/$1 ] && break
+			[ -d /sys/block/[shv]d$h/$1 ] && break
 			d=$(($d+1))
 		done
 		p=$((`echo $1 | cut -b4-`-1))
@@ -298,7 +298,7 @@ install_hd()
 	select_dev || rebooting
 	retval=1
 	case "$choice" in
-		[sh]d*)
+		[shv]d*)
 			install_to $choice
 			retval=$?
 			;;
