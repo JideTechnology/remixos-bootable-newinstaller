@@ -237,10 +237,12 @@ install_to()
 			d=$(($d+1))
 		done
 		p=$((`echo $1 | cut -b4-`-1))
+		disk=`echo $1 | cut -b-3`
 		create_menulst $p
 		create_winitem $1 $d
 		rm -f /hd/boot/grub/stage1
-		echo "setup (hd$d) (hd$d,$p)" | grub > /dev/tty5
+		echo "(hd$d) /dev/$disk" > /hd/grub/device.map
+		echo "setup (hd$d) (hd$d,$p)" | grub --device-map /hd/grub/device.map > /dev/tty5
 		[ $? -ne 0 ] && return 255
 	fi
 
