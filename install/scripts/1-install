@@ -32,7 +32,10 @@ choose()
 partition_drive()
 {
 	echo -n > $menufile
-	for i in /sys/block/[sh]d[a-z]; do
+	for i in /sys/block/[shv]d[a-z]; do
+		if [ ! -d $i ]; then  # pathname expansion failed
+			continue
+		fi
 		echo -n `basename $i` >> $menufile
 		if [ -f $i/removable -a `cat $i/removable` -eq 0 ]; then
 			echo -n ' "Harddisk ' >> $menufile
@@ -192,7 +195,7 @@ create_data_img()
 try_upgrade()
 {
 	[ -d $1 ] && return
-	PREV_VERS="4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	PREV_VERS="4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
 	for v in $PREV_VERS; do
 		prev=hd/android-$v
 		if [ -d $prev ]; then
@@ -230,14 +233,16 @@ install_to()
 		d=0
 		while [ 1 ]; do
 			h=`echo $d | awk '{ printf("%c", $1+97) }'`
-			[ -d /sys/block/[sh]d$h/$1 ] && break
+			[ -d /sys/block/[shv]d$h/$1 ] && break
 			d=$(($d+1))
 		done
 		p=$((`echo $1 | cut -b4-`-1))
+		disk=`echo $1 | cut -b-3`
 		create_menulst $p
 		create_winitem $1 $d
 		rm -f /hd/boot/grub/stage1
-		echo "setup (hd$d) (hd$d,$p)" | grub > /dev/tty5
+		echo "(hd$d) /dev/$disk" > /hd/grub/device.map
+		echo "setup (hd$d) (hd$d,$p)" | grub --device-map /hd/grub/device.map > /dev/tty5
 		[ $? -ne 0 ] && return 255
 	fi
 
@@ -295,7 +300,7 @@ install_hd()
 	select_dev || rebooting
 	retval=1
 	case "$choice" in
-		[sh]d*)
+		[shv]d*)
 			install_to $choice
 			retval=$?
 			;;
