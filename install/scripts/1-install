@@ -32,7 +32,7 @@ choose()
 partition_drive()
 {
 	echo -n > $menufile
-	for i in /sys/block/[shv]d[a-z]; do
+	for i in /sys/block/[shv]d[a-z] /sys/block/mmcblk?; do
 		if [ ! -d $i ]; then  # pathname expansion failed
 			continue
 		fi
@@ -300,7 +300,7 @@ install_hd()
 	select_dev || rebooting
 	retval=1
 	case "$choice" in
-		[shv]d*)
+		[shvm][dm]*)
 			install_to $choice
 			retval=$?
 			;;
