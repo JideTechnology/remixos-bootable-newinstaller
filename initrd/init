@@ -78,8 +78,15 @@ check_root()
 	else
 		dev=$1
 	fi
-	try_mount ro $dev /mnt && [ -e /mnt/$SRC/ramdisk.img ]
-	[ $? -ne 0 ] && return 1
+	try_mount ro $dev /mnt || return 1
+	if [ -n "$iso" -a -e /mnt/$iso ]; then
+		mount --move /mnt /iso
+		mkdir /mnt/iso
+		mount -o loop /iso/$iso /mnt/iso
+		SRC=iso
+	elif [ ! -e /mnt/$SRC/ramdisk.img ]; then
+		return 1
+	fi
 	zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
 	if [ -e /mnt/$SRC/system.sfs ]; then
 		mount -o loop /mnt/$SRC/system.sfs /sfs
@@ -120,6 +127,16 @@ debug_shell()
 echo -n Detecting Android-x86...
 
 [ -z "$SRC" -a -n "$BOOT_IMAGE" ] && SRC=`dirname $BOOT_IMAGE`
+
+for c in `cat /proc/cmdline`; do
+	case $c in
+		iso-scan/filename=*)
+			eval `echo $c | cut -b1-3,18-`
+			;;
+		*)
+			;;
+	esac
+done
 
 mount -t tmpfs tmpfs /android
 cd /android
