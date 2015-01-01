@@ -333,16 +333,14 @@ do_install()
 		Run*)
 			cd /android
 			umount system
-			if mountpoint -q /sfs; then
-				umount /sfs
-				if [ -e /hd/$asrc/system.sfs ]; then
-					mount -o loop /hd/$asrc/system.sfs /sfs
-					mount -o loop /sfs/system.img system
-				else
-					mount -o loop /hd/$asrc/system.img system
-				fi
-			else
+			mountpoint -q /sfs && umount /sfs
+			if [ -e /hd/$asrc/system.sfs ]; then
+				mount -o loop /hd/$asrc/system.sfs /sfs
+				mount -o loop /sfs/system.img system
+			elif [ -e /hd/$asrc/system.img ]; then
 				mount -o loop /hd/$asrc/system.img system
+			else
+				mount --bind /hd/$asrc/system system
 			fi
 			if [ -d /hd/$asrc/data ]; then
 				mount --bind /hd/$asrc/data data
