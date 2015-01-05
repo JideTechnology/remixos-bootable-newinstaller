@@ -32,7 +32,7 @@ choose()
 partition_drive()
 {
 	echo -n > $menufile
-	for i in /sys/block/[shv]d[a-z]; do
+	for i in /sys/block/[shv]d[a-z] /sys/block/mmcblk?; do
 		if [ ! -d $i ]; then  # pathname expansion failed
 			continue
 		fi
@@ -195,7 +195,7 @@ create_data_img()
 try_upgrade()
 {
 	[ -d $1 ] && return
-	PREV_VERS="4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	PREV_VERS="4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
 	for v in $PREV_VERS; do
 		prev=hd/android-$v
 		if [ -d $prev ]; then
@@ -300,7 +300,7 @@ install_hd()
 	select_dev || rebooting
 	retval=1
 	case "$choice" in
-		[shv]d*)
+		[shvm][dm]*)
 			install_to $choice
 			retval=$?
 			;;
@@ -333,16 +333,14 @@ do_install()
 		Run*)
 			cd /android
 			umount system
-			if mountpoint -q /sfs; then
-				umount /sfs
-				if [ -e /hd/$asrc/system.sfs ]; then
-					mount -o loop /hd/$asrc/system.sfs /sfs
-					mount -o loop /sfs/system.img system
-				else
-					mount -o loop /hd/$asrc/system.img system
-				fi
-			else
+			mountpoint -q /sfs && umount /sfs
+			if [ -e /hd/$asrc/system.sfs ]; then
+				mount -o loop /hd/$asrc/system.sfs /sfs
+				mount -o loop /sfs/system.img system
+			elif [ -e /hd/$asrc/system.img ]; then
 				mount -o loop /hd/$asrc/system.img system
+			else
+				mount --bind /hd/$asrc/system system
 			fi
 			if [ -d /hd/$asrc/data ]; then
 				mount --bind /hd/$asrc/data data
