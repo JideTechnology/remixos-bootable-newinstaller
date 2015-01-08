@@ -93,9 +93,13 @@ progress_bar()
 format_fs()
 {
 	local cmd
-	echo -e '"Do not format" ""\next3 ""\next2 ""\nntfs ""\nfat32 ""' > $menufile
+	echo -e '"Do not format" ""\next4 ""\next3 ""\next2 ""\nntfs ""\nfat32 ""' > $menufile
 	choose "Choose filesystem" "Please select a filesystem to format $1:"
 	case "$choice" in
+		ext4)
+			dialog --title " Notice " --msgbox "\nAndroid-x86 bootloader can't support booting from ext4. You need to install a bootloader supporting ext4 manually, e.g., grub2." 9 49
+			cmd="make_ext4fs -L"
+			;;
 		ext3)
 			cmd="mke2fs -jL"
 			;;
@@ -183,7 +187,7 @@ create_data_img()
 	if [ $? -eq 0 ]; then
 		if create_img 512 data.img; then
 			losetup /dev/loop6 data.img
-			mke2fs -jL /data /dev/loop6 > /dev/tty6
+			make_ext4fs -L /data /dev/loop6 > /dev/tty6
 		fi
 		[ $? -ne 0 ] && dialog --msgbox "\n Failed to create data.img." 7 33
 	else
@@ -226,7 +230,7 @@ install_to()
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
 
 	asrc=android-$VER
-	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
+	[ "$fs" != "ext4" ] && dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install boot loader GRUB?" 7 47
 	if [ $? -eq 0 ]; then
 		cp -af /grub /hd
