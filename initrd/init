@@ -101,8 +101,7 @@ check_root()
 		rm -rf *
 		return 1
 	fi
-	mkdir cache mnt
-	mount -t tmpfs tmpfs cache
+	mkdir mnt
 	echo " found at $1"
 }
 
