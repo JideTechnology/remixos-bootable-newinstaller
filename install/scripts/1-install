@@ -60,7 +60,12 @@ partition_drive()
 		choose "Choose Drive" "Please select a drive to edit partitions:"
 	fi
 	if [ $retval -eq 0 ]; then
-		cfdisk /dev/$choice
+		dialog --title " Confirm " --defaultno --yesno "\n Do you want to use GPT?" 7 29
+		if [ $? -eq 0 ]; then
+			cgdisk /dev/$choice
+		else
+			cfdisk /dev/$choice
+		fi
 		if [ $? -eq 0 ]; then
 			retval=1
 		else
@@ -72,12 +77,31 @@ partition_drive()
 
 select_dev()
 {
-	fdisk -l | grep ^/dev | cut -b6-12,55- | awk '{
-		if (!match($2, "Extended")) {
-			printf("\"%-28s", $0)
-			system("echo -n `cat /sys/block/*/"$1"/../device/model`")
-			printf("\" \"\"\n")
-		}
+	blkid | grep -v -E "^/dev/block/|^/dev/loop" | cut -b6- | sort | awk '{
+		t="unknown"
+		for (i = NF; i > 1; --i)
+			if (match($i, "^TYPE")) {
+				t=$i
+				break
+			}
+		gsub(/TYPE=|"/, "", t)
+		printf("%s\t%s\n", $1, t)
+	}' > $tempfile
+
+	lsblk=`ls /sys/block | grep -v -E "loop|ram|sr|boot|rpmb"`
+	for d in $lsblk; do
+		p=0
+		for i in /sys/block/$d/$d* /sys/block/$d; do
+			[ -e $i/partition ] && p=1
+			[ $p -eq 1 -a "$i" = "/sys/block/$d" ] && break
+			echo $i | grep -q -E "boot|rpmb" && continue
+			[ -d $i ] && ( grep "`basename $i:`" $tempfile || echo "`basename $i` unknown" )
+		done
+	done | awk '{
+		sub(/:/, "", $1)
+		printf("\"%-13s%-17s", $1, $2)
+		system("cd /sys/block; for f in "$1"/device/model "$1"/device/name */"$1"/../device/model */"$1"/../device/name; do [ -e $f ] && echo -n `cat $f` && break; done")
+		printf("\" \"\"\n")
 	} END {
 		printf("\"Create/Modify partitions\" \"\"\n\"Detect devices\" \"\"")
 	}' > $menufile
@@ -116,7 +140,7 @@ format_fs()
 			;;
 	esac
 	if [ -n "$cmd" ]; then
-		dialog --title " Confirm " --no-label Skip --yesno \
+		dialog --title " Confirm " --defaultno --yesno \
 			"\n You chose to format $1 to $choice.\n All data in that partition will LOSE.\n\n Are you sure to format the partition $1?" 10 51
 		[ $? -ne 0 ] && return 1
 		$cmd Android-x86 /dev/$1 | awk '{
@@ -139,7 +163,6 @@ create_menulst()
 	menulst=/hd/grub/menu.lst
 	[ -n "$VESA" ] && vga=" vga=788 modeset=0"
 	echo -e "${GRUB_OPTIONS:-default=0\ntimeout=6\nsplashimage=/grub/android-x86.xpm.gz\n}root (hd0,$1)\n" > $menulst
-	cmdline=`cat /proc/cmdline | sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE.*\)||"`
 
 	create_entry "Android-x86 $VER" quiet $cmdline
 	create_entry "Android-x86 $VER (Debug mode)" $cmdline DEBUG=2
@@ -215,6 +238,20 @@ try_upgrade()
 	done
 }
 
+get_part_info()
+{
+	d=0
+	while [ 1 ]; do
+		h=`echo $d | awk '{ printf("%c", $1+97) }'`
+		for part in /sys/block/[shv]d$h/$1 /sys/block/mmcblk$d/$1; do
+			[ -d $part ] && break 2
+		done
+		d=$(($d+1))
+	done
+	p=`cat $part/partition`
+	disk=$(basename `dirname $part`)
+}
+
 install_to()
 {
 	cd /
@@ -228,26 +265,46 @@ install_to()
 	done
 
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
+	cmdline=`sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE=\S\+\?\s*\)||" /proc/cmdline`
 
 	asrc=android-$VER
 	[ "$fs" != "ext4" ] && dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install boot loader GRUB?" 7 47
 	if [ $? -eq 0 ]; then
 		cp -af /grub /hd
-		d=0
-		while [ 1 ]; do
-			h=`echo $d | awk '{ printf("%c", $1+97) }'`
-			[ -d /sys/block/[shv]d$h/$1 ] && break
-			d=$(($d+1))
-		done
-		p=$((`echo $1 | cut -b4-`-1))
-		disk=`echo $1 | cut -b-3`
+		get_part_info $1
+		p=$(($p-1))
 		create_menulst $p
 		create_winitem $1 $d
 		rm -f /hd/boot/grub/stage1
 		echo "(hd$d) /dev/$disk" > /hd/grub/device.map
 		echo "setup (hd$d) (hd$d,$p)" | grub --device-map /hd/grub/device.map > /dev/tty5
 		[ $? -ne 0 ] && return 255
+	fi
+
+	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
+		"\n Do you want to install EFI GRUB2?" 7 39
+	if [ $? -eq 0 ]; then
+		get_part_info $1
+		for i in /sys/block/$disk/$disk*; do
+			[ 0`cat $i/partition` -eq 1 ] && break
+		done
+		boot=`basename $i`
+		mountpoint -q /hd && umount /hd
+		dialog --title " Confirm " --defaultno --yesno \
+			"\n Do you want to format the boot partition\n /dev/$boot?" 8 45
+		[ $? -eq 0 ] && mkdosfs -n EFI /dev/$boot
+		try_mount rw /dev/$boot /hd
+		cp -af /grub2/efi /hd
+		grubcfg=/hd/efi/boot/grub.cfg
+		echo -e "set timeout=6" > $grubcfg
+		echo -e "menuentry \"Android-x86 $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel quiet $cmdline \n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Android-x86 $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel $cmdline DEBUG=2\n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
+		if [ -e /hd/EFI/Microsoft/Boot/bootmgfw.efi ]; then
+			echo -e "menuentry \"Windows (UEFI)\" {\n\tsearch --set=root --file /EFI/Microsoft/Boot/bootmgfw.efi\n\tchainloader /EFI/Microsoft/Boot/bootmgfw.efi\n}" >> $grubcfg
+		fi
+		mountpoint -q /hd && umount /hd
+		try_mount rw /dev/$1 /hd
 	fi
 
 	dialog --title " Question " --yesno \
@@ -278,10 +335,12 @@ install_to()
 	result=$((`cat /tmp/result`*255))
 
 	if [ $result -eq 0 ]; then
-		chmod 644 *
-		chown 0.0 *
 		for d in android mnt sfs ./$SRC; do
 			[ -d $d ] && mv $d/* . && rmdir $d
+		done
+		chown 0.0 *
+		for f in *; do
+			[ -d $f ] || chmod 644 $f
 		done
 
 		case "$fs" in
@@ -294,6 +353,7 @@ install_to()
 		esac
 	fi
 
+	dialog --infobox "\n Syncing to disk..." 5 27
 	sync
 
 	return $result
