@@ -65,5 +65,4 @@ load_modules()
 	done
 
 	load_uvesafb
-	lsusb -v | awk ' /Class:.E0/ { printf("%s      0660   bluetooth bluetooth\n", $9) } ' >> ueventd.android_x86.rc
 }
