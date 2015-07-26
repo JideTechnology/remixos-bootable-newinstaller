@@ -1,0 +1,37 @@
+#!/bin/sh
+
+[ "$1" = "-v" ] && verbose=-v && shift
+
+src=$1
+dst=${2:-.}
+
+usage()
+{
+	echo "Usage: $(basename $0) SRC_DIR [DST_DIR]"
+	echo
+	exit 1
+}
+
+linkdir()
+{
+	local odir="$PWD"
+	[ -d "$2" ] || mkdir -p "$2"
+	cd "$2"
+	local d="$PWD"
+	cd "$odir" && cd "$1"
+	for f in * .*; do
+		[ "$f" = "." -o "$f" = ".." ] && continue
+		if [ -d "$f" ]; then
+			linkdir "$f" "$d/$f"
+		elif [ -e "$f" ]; then
+			ln $verbose "$f" "$d"
+		fi
+	done
+	cd "$odir"
+}
+
+[ -z "$src" ] && usage
+
+echo "$src" | grep -q /$ || dst=$dst/$(basename "$src")
+
+linkdir "$src" "$dst"
