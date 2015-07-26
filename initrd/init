@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2014/01/15
+# Last updated 2015/07/27
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -103,6 +103,7 @@ check_root()
 	fi
 	mkdir mnt
 	echo " found at $1"
+	hash -r
 }
 
 remount_rw()
@@ -114,9 +115,9 @@ remount_rw()
 
 debug_shell()
 {
-	if which mksh >/dev/null 2>&1; then
+	if [ -x system/bin/sh ]; then
 		echo Running MirBSD Korn Shell...
-		USER="($1)" mksh -l 2>&1
+		USER="($1)" system/bin/sh -l 2>&1
 	else
 		echo Running busybox ash...
 		sh 2>&1
@@ -150,22 +151,18 @@ done
 
 ln -s mnt/$SRC /src
 ln -s android/system /
-ln -s ../system/lib/modules /lib
-ln -s ../system/lib/firmware /lib
+ln -s ../system/lib/firmware ../system/lib/modules /lib
 
 if [ -n "$INSTALL" ]; then
-	cd /
-	zcat /src/install.img | cpio -iud > /dev/null
+	zcat /src/install.img | ( cd /; cpio -iud > /dev/null )
 fi
 
 if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	mv /bin /lib .
-	system/bin/ln -s android/lib /lib
-	system/bin/ln -s android/bin /bin
-	sed -i 's|\(PATH *\)\(/sbin\)|\1/bin:\2|' init.rc
+	sed -i 's|\( PATH.*\)|\1:/bin|' init.environ.rc
 	mv /sbin/* sbin
 	rmdir /sbin
-	ln -s android/sbin /
+	system/bin/ln -s android/bin android/lib android/sbin /
 fi
 
 # ensure keyboard driver is loaded
