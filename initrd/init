@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2015/07/27
+# Last updated 2015/10/05
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -103,6 +103,7 @@ check_root()
 	fi
 	mkdir mnt
 	echo " found at $1"
+	rm /sbin/mke2fs
 	hash -r
 }
 
@@ -160,9 +161,10 @@ fi
 if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	mv /bin /lib .
 	sed -i 's|\( PATH.*\)|\1:/bin|' init.environ.rc
-	mv /sbin/* sbin
+	rm /sbin/modprobe
+	busybox mv /sbin/* sbin
 	rmdir /sbin
-	system/bin/ln -s android/bin android/lib android/sbin /
+	ln -s android/bin android/lib android/sbin /
 fi
 
 # ensure keyboard driver is loaded
