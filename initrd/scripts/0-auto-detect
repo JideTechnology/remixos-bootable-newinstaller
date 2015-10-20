@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2012/07/10
+# Last updated 2015/10/20
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -18,12 +18,6 @@ auto_detect()
 	source $tmp
 	cat /sys/bus/*/devices/*/modalias | dev2mod
 	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
-}
-
-load_uvesafb()
-{
-	[ -x /sbin/v86d ] || ln -s ../android/sbin/v86d /sbin
-	[ -c /dev/fb0 ] || modprobe uvesafb mode_option=${UVESA_MODE:-800x600}-16 ${UVESA_OPTION:-mtrr=3 scroll=redraw}
 }
 
 find_network_dev_name()
@@ -63,6 +57,4 @@ load_modules()
 	for m in $EXTMOD; do
 		modprobe $m
 	done
-
-	load_uvesafb
 }
