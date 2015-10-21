@@ -53,7 +53,6 @@ load_modules()
 	fi
 
 	# 3G modules
-	EXTMOD="$EXTMOD pppoe ppp-async ppp-deflate bsd-comp"
 	for m in $EXTMOD; do
 		modprobe $m
 	done
