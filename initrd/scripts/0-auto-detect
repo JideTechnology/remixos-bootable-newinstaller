@@ -18,6 +18,7 @@ auto_detect()
 	source $tmp
 	cat /sys/bus/*/devices/*/modalias | dev2mod
 	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
+    cat /sys/bus/*/devices/*/uevent|grep MODALIAS|sed 's/^MODALIAS=//'|sort -u | dev2mod
 }
 
 find_network_dev_name()

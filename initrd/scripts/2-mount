@@ -7,45 +7,100 @@
 # with Android-x86 project.
 #
 
+initialize_data_img()
+{
+    MIN_SPEED=10
+
+    if [ -n "$SKIP_WRITE_SPPED_TEST" ]; then
+        create_and_format_data_img
+    else
+        echo "USB Writing Speed Test ..."
+        SPEEDRESULT=`dd if=/dev/zero bs=1M count=100 of=/mnt/$SRC/speedtest conv=fsync 2>&1`
+        rm /mnt/$SRC/speedtest
+        SPEED=`echo $SPEEDRESULT | sed -n "s/^.*, \([0-9.]\+\)MB\/s/\1/p"`
+        if [ -n "$SPEED" ]; then
+            echo "USB Writing Speed: $SPEED MB/s"
+            if [ $(awk "BEGIN{ print (0$SPEED<$MIN_SPEED)?1:0 }") = 1 ] ; then
+                echo "USB with writing speed lower than ${MIN_SPEED} MB/s detected. System may fail to boot up. To continue, press any key." 
+                read
+            fi
+            create_and_format_data_img
+        else
+            echo "Cannot detect the USB writing speed. System may fail to boot up. To continue, press any key."
+            read
+            create_and_format_data_img
+        fi
+    fi
+
+}
+
+create_and_format_data_img()
+{
+    echo "Initialize Data Partition, please be patient ..."
+    dd if=/dev/zero bs=1M count=4095 | pv -s 4095m | dd of=/mnt/$SRC/data.img
+    echo "Format Data Partition ..."
+    mke2fs -F -t ext4 /mnt/$SRC/data.img
+}
+
 mount_data()
 {
-	mountpoint -q data && return
-	[ -n "$DATA" ] && blk=`basename $DATA` || blk=
-	if [ -b "/dev/$blk" ]; then
-		[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
-		mount /dev/block/$blk data
-	elif [ -d /mnt/$SRC/data ]; then
-		remount_rw
-		mount --bind /mnt/$SRC/data data
-	elif [ -f /mnt/$SRC/data.img ]; then
-		remount_rw
-		mount -o loop /mnt/$SRC/data.img data
-	else
-		device_mount_data || mount -t tmpfs tmpfs data
-	fi
+    INITIALIZE=false
+    mountpoint -q data && return
+    [ -n "$DATA" ] && blk=`basename $DATA` || blk=
+    if [ -n "$CREATE_DATA_IMG" ]; then
+        remount_rw
+        if [ ! -s /mnt/$SRC/data.img ]; then
+            initialize_data_img
+            INITIALIZE=true
+        fi
+        echo "Checking Data Partition ..."
+        e2fsck -p -y /mnt/$SRC/data.img
+        mount -o loop /mnt/$SRC/data.img data
+        if [ "$INITIALIZE" = "true" ]; then
+            touch data/initialize_flag
+        fi
+    elif [ -n "$DATA_IN_MEM" ]; then
+        mount -t tmpfs tmpfs data
+    elif [ -b "/dev/$blk" ]; then
+        [ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+        mount /dev/block/$blk data
+    elif [ -d /mnt/$SRC/data ]; then
+        remount_rw
+        mount --bind /mnt/$SRC/data data
+    elif [ -f /mnt/$SRC/data.img ]; then
+        remount_rw
+        mount -o loop /mnt/$SRC/data.img data
+    else
+        device_mount_data || mount -t tmpfs tmpfs data
+            fi
 }
 
 mount_sdcard()
 {
-	mountpoint -q sdcard && return
-	if [ -n "$SDCARD" -a -e /mnt/$SRC$SDCARD ]; then
-		if [ ! -e /android$SDCARD ]; then
-			remount_rw
-			sddir=`dirname $SDCARD`
-			mkdir /android$sddir
-			mount --bind /mnt/$SRC$sddir /android$sddir
-		fi
-	elif [ "$SDCARD" = "premount" ]; then
-	# WARNING: premount the sdcard is deprecated since froyo-x86.
-	# It is left only for backward compatibility and may be removed
-	# in the future.
-		if [ -d /mnt/$SRC/sdcard ]; then
-			remount_rw
-			mount --bind /mnt/$SRC/sdcard mnt/sdcard
-		elif [ -d data/sdcard ]; then
-			mount --bind data/sdcard mnt/sdcard
-		else
-			mount -o mode=2777,uid=1000,gid=1015 -t tmpfs tmpfs mnt/sdcard
-		fi
-	fi
+    if [ -d /mnt/$SRC/sdcard ]; then
+        remount_rw
+        mkdir mnt/sdcard2
+        mount --bind /mnt/$SRC/sdcard mnt/sdcard2
+    fi
+    mountpoint -q sdcard && return
+    if [ -n "$SDCARD" -a -e /mnt/$SRC$SDCARD ]; then
+        if [ ! -e /android$SDCARD ]; then
+            remount_rw
+            sddir=`dirname $SDCARD`
+            mkdir /android$sddir
+            mount --bind /mnt/$SRC$sddir /android$sddir
+        fi
+    elif [ "$SDCARD" = "premount" ]; then
+    # WARNING: premount the sdcard is deprecated since froyo-x86.
+    # It is left only for backward compatibility and may be removed
+    # in the future.
+        if [ -d /mnt/$SRC/sdcard ]; then
+            remount_rw
+            mount --bind /mnt/$SRC/sdcard mnt/sdcard
+        elif [ -d data/sdcard ]; then
+            mount --bind data/sdcard mnt/sdcard
+        else
+            mount -o mode=2777,uid=1000,gid=1015 -t tmpfs tmpfs mnt/sdcard
+        fi
+    fi
 }

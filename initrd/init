@@ -88,7 +88,11 @@ check_root()
 		return 1
 	fi
 	zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
-	if [ -e /mnt/$SRC/system.sfs ]; then
+	[ -n "$SYSTEM" ] && blk=`basename $SYSTEM` || blk=
+	if [ -b "/dev/$blk" ]; then
+		[ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+		mount -o ro /dev/block/$blk system
+	elif [ -e /mnt/$SRC/system.sfs ]; then
 		mount -o loop /mnt/$SRC/system.sfs /sfs
 		mount -o loop /sfs/system.img system
 	elif [ -e /mnt/$SRC/system.img ]; then
@@ -123,6 +127,14 @@ debug_shell()
 		echo Running busybox ash...
 		sh 2>&1
 	fi
+}
+
+check_serialno()
+{
+    if [ ! -f /mnt/$SRC/isolinux.sys ]; then
+        cat /proc/sys/kernel/random/uuid > /mnt/$SRC/isolinux.sys
+    fi
+    cat /mnt/$SRC/isolinux.sys > data/serialno
 }
 
 echo -n Detecting Android-x86...
@@ -191,6 +203,7 @@ done
 load_modules
 mount_data
 mount_sdcard
+check_serialno
 setup_tslib
 setup_dpi
 post_detect

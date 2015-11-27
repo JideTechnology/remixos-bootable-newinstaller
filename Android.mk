@@ -63,6 +63,12 @@ initrd_bin := \
 	$(wildcard $(initrd_dir)/*/*)
 
 systemimg  := $(PRODUCT_OUT)/system.$(if $(MKSQUASHFS),sfs,img)
+signedsystemimg  :=  $(PRODUCT_OUT)/signed/system.$(if $(MKSQUASHFS),sfs,img)
+dataimg  := $(PRODUCT_OUT)/data.img
+
+$(dataimg):
+	dd if=/dev/zero of=$@ bs=1M count=1 seek=1024
+	mkfs.ext4 -F -j $@
 
 INITRD_RAMDISK := $(PRODUCT_OUT)/initrd.img
 $(INITRD_RAMDISK): $(initrd_bin) $(systemimg) $(TARGET_INITRD_SCRIPTS) | $(ACP) $(MKBOOTFS)
@@ -84,12 +90,24 @@ $(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) $(systemimg) $(GENERIC_X8
 	$(hide) rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
 
-BUILT_IMG := $(addprefix $(PRODUCT_OUT)/,ramdisk.img initrd.img install.img) $(systemimg)
-BUILT_IMG += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)
+BUILT_IMG_MIN := $(addprefix $(PRODUCT_OUT)/,ramdisk.img initrd.img install.img)
+BUILT_IMG_MIN += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)
+BUILT_IMG := $(BUILT_IMG_MIN) $(if $(BUILD_SIGNED_IMG), $(signedsystemimg), $(systemimg))
 
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
 $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG)
 	@echo ----- Making iso image ------
+	$(hide) $(call check-density,$</isolinux/isolinux.cfg)
+	$(hide) sed -i "s|\(Installation CD\)\(.*\)|\1 $(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
+	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
+		-no-emul-boot -boot-load-size 4 -boot-info-table \
+		-input-charset utf-8 -V "Android-x86 LiveCD" -o $@ $^
+	$(hide) isohybrid $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
+	@echo -e "\n\n$@ is built successfully.\n\n"
+
+MIN_ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)_min.iso
+$(MIN_ISO_IMAGE): $(boot_dir) $(BUILT_IMG_MIN)
+	@echo ----- Making minimal iso image ------
 	$(hide) $(call check-density,$</isolinux/isolinux.cfg)
 	$(hide) sed -i "s|\(Installation CD\)\(.*\)|\1 $(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
 	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
@@ -104,7 +122,7 @@ ESP_LAYOUT := $(LOCAL_PATH)/editdisklbl/esp_layout.conf
 $(EFI_IMAGE): $(wildcard $(LOCAL_PATH)/boot/efi/*/*) $(BUILT_IMG) $(ESP_LAYOUT) | $(edit_mbr)
 	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(<D)/grub.cfg > $(@D)/grub.cfg
 	$(hide) size=0; \
-	for s in `du -sk $^ | awk '{print $$1}'`; do \
+	for s in `du --apparent-size -sk $^ | awk '{print $$1}'`; do \
 		size=$$(($$size+$$s)); \
         done; \
 	size=$$(($$(($$(($$(($$(($$size + $$(($$size / 100)))) - 1)) / 32)) + 1)) * 32)); \
@@ -114,9 +132,10 @@ $(EFI_IMAGE): $(wildcard $(LOCAL_PATH)/boot/efi/*/*) $(BUILT_IMG) $(ESP_LAYOUT) 
 	$(hide) cat /dev/null > $@; $(edit_mbr) -l $(ESP_LAYOUT) -i $@ esp=$@.fat
 	$(hide) rm -f $@.fat
 
-.PHONY: iso_img usb_img efi_img
+.PHONY: iso_img usb_img efi_img iso_minimg
 iso_img: $(ISO_IMAGE)
 usb_img: $(ISO_IMAGE)
 efi_img: $(EFI_IMAGE)
+isomin_img: $(MIN_ISO_IMAGE)
 
 endif
