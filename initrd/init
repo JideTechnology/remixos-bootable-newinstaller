@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2015/10/23
+# Last updated 2015/10/05
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -94,10 +94,10 @@ check_root()
 		mount -o ro /dev/block/$blk system
 	elif [ -e /mnt/$SRC/system.sfs ]; then
 		mount -o loop /mnt/$SRC/system.sfs /sfs
-		mount -o loop /sfs/system.img system
+		mount -o loop,ro /sfs/system.img system
 	elif [ -e /mnt/$SRC/system.img ]; then
 		remount_rw
-		mount -o loop /mnt/$SRC/system.img system
+		mount -o loop,ro /mnt/$SRC/system.img system
 	elif [ -d /mnt/$SRC/system ]; then
 		remount_rw
 		mount --bind /mnt/$SRC/system system
@@ -129,12 +129,72 @@ debug_shell()
 	fi
 }
 
+check_ota()
+{
+	remount_rw
+	if [ -e "data/media/0/autoupdater/otapackage.zip" ]; then
+		echo "Start updating..."
+		if [ "x$SRC" != "x" ]; then
+			ln -s /mnt/$SRC/ramdisk.img /mnt/ramdisk.img
+			ln -s /mnt/$SRC/initrd.img /mnt/initrd.img
+			ln -s /mnt/$SRC/kernel /mnt/kernel
+		fi
+		if [ -e "/sfs/system.img" ]; then
+			cp /sfs/system.img /mnt/$SRC/system.img
+		fi
+
+		if [ "x$SRC" != "x" ]; then
+			ln -s /mnt/$SRC/system.img /mnt/system.img
+		fi
+		x86update data/media/0/autoupdater/otapackage.zip
+		success="$?"
+		if [ -L /mnt/$SRC/ramdisk.img ]; then
+			rm /mnt/$SRC/ramdisk.img
+		fi
+		if [ -L /mnt/$SRC/initrd.img ]; then
+			rm /mnt/$SRC/initrd.img
+		fi
+		if [ -L /mnt/$SRC/kernel ]; then
+			rm /mnt/$SRC/kernel
+		fi
+		if [ -L /mnt/$SRC/system.img ]; then
+			rm /mnt/$SRC/system.img
+		fi
+		rm data/media/0/autoupdater/otapackage.zip
+		if [ $success -eq 0 ]; then
+			echo "Update successfully"
+			if [ -e "/mnt/$SRC/system.sfs" ]; then
+				rm -f /mnt/$SRC/system.sfs
+			fi
+			echo "Preparing to restart. Please wait ..."
+			sync
+			sleep 2
+			sync
+			sleep 2
+			sync
+			sleep 2
+			reboot -f
+		else
+			echo "Update failed"
+		fi
+	fi
+}
+
+check_disk_removable()
+{
+	DISKINFO=$(df | grep /mnt)
+	DISK=${DISKINFO:11:3}
+	cat /sys/block/$DISK/removable > data/disk_removable
+}
+
 check_serialno()
 {
-    if [ ! -f /mnt/$SRC/isolinux.sys ]; then
-        cat /proc/sys/kernel/random/uuid > /mnt/$SRC/isolinux.sys
-    fi
-    cat /mnt/$SRC/isolinux.sys > data/serialno
+	remount_rw
+	if [ ! -f /mnt/$SRC/isolinux.sys ]; then
+		UUID=`cat /proc/sys/kernel/random/uuid`
+	echo ${UUID//-/} > /mnt/$SRC/isolinux.sys
+	fi
+	cat /mnt/$SRC/isolinux.sys > data/serialno
 }
 
 echo -n Detecting Android-x86...
@@ -177,11 +237,10 @@ if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	busybox mv /sbin/* sbin
 	rmdir /sbin
 	ln -s android/bin android/lib android/sbin /
-	hash -r
 fi
 
 # ensure keyboard driver is loaded
-[ -n "$INSTALL" -o -n "$DEBUG" ] && busybox modprobe atkbd
+[ -n "$INSTALL" -o -n "$DEBUG" ] && modprobe atkbd
 
 if [ 0$DEBUG -gt 0 ]; then
 	echo -e "\nType 'exit' to continue booting...\n"
@@ -203,6 +262,8 @@ done
 load_modules
 mount_data
 mount_sdcard
+check_disk_removable
+check_ota
 check_serialno
 setup_tslib
 setup_dpi

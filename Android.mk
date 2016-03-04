@@ -86,9 +86,29 @@ $(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/* $(LOCAL_PATH)/install/*
 	$(MKBOOTFS) $(dir $(dir $(<D))) | gzip -9 > $@
 
 boot_dir := $(PRODUCT_OUT)/boot
+efi_remixos_dir := $(boot_dir)/efi/RemixOS
+efi_boot_dir := $(boot_dir)/efi/boot
+efi_ia32_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*ia32.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*32.mod)
+efi_x64_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*x64.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*64.mod)
+efi_x64_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub64.cfg
+efi_ia32_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub32.cfg
+efi_boot_grub :=$(LOCAL_PATH)/boot/efi/boot/grub.cfg
 $(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) $(systemimg) $(GENERIC_X86_CONFIG_MK) | $(ACP)
 	$(hide) rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
+	$(hide) mkdir -p $(efi_remixos_dir)
+	$(hide) mkdir -p $(efi_boot_dir)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_boot_grub) > $(efi_boot_dir)/grub.cfg
+ifeq ($(TARGET_ARCH),x86)
+	$(hide) cp $(efi_ia32_files) $(efi_remixos_dir)
+	$(hide) cp $(efi_ia32_files) $(efi_boot_dir)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub.cfg
+else
+	$(hide) cp $(efi_x64_files) $(efi_remixos_dir)
+	$(hide) cp $(efi_x64_files) $(efi_boot_dir)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_x64_grub) > $(efi_remixos_dir)/grub.cfg
+endif
+
 
 BUILT_IMG_MIN := $(addprefix $(PRODUCT_OUT)/,ramdisk.img initrd.img install.img)
 BUILT_IMG_MIN += $(if $(TARGET_PREBUILT_KERNEL),$(TARGET_PREBUILT_KERNEL),$(PRODUCT_OUT)/kernel)

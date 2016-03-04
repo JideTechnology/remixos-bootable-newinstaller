@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2015/10/23
+# Last updated 2016/01/23
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -13,8 +13,10 @@ auto_detect()
 	tmp=/tmp/dev2mod
 	echo 'dev2mod() { while read dev; do case $dev in' > $tmp
 	sort -r /lib/modules/`uname -r`/modules.alias | \
-		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)busybox modprobe \2;;/p' >> $tmp
+		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)modprobe \2;;/p' >> $tmp
 	echo 'esac; done; }' >> $tmp
+	sed -i '/brcmfmac/d' $tmp
+	sed -i '/bcma/d' $tmp
 	source $tmp
 	cat /sys/bus/*/devices/*/modalias | dev2mod
 	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
@@ -42,12 +44,20 @@ find_network_dev_name()
 
 load_modules()
 {
-	if [ -z "$FOUND" ]; then
+	if [ -n "$FOUND" ]; then
+		[ -n "$PREDEV" ] && modprobe $PREDEV
+		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
+		[ -n "$LANDEV" ] && modprobe $LANDEV
+		[ -n "$WIFDEV" ] && modprobe $WIFDEV
+		[ -n "$SNDDEV" ] && modprobe $SNDDEV
+		[ -n "$CAMDEV" ] && modprobe $CAMDEV
+	else
 		auto_detect
 	fi
 
 	# 3G modules
+	EXTMOD="$EXTMOD pppoe ppp-async ppp-deflate bsd-comp"
 	for m in $EXTMOD; do
-		busybox modprobe $m
+		modprobe $m
 	done
 }

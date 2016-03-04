@@ -7,28 +7,24 @@
 # with Android-x86 project.
 #
 
-initialize_data_img()
+write_speed_test()
 {
     MIN_SPEED=10
 
-    if [ -n "$SKIP_WRITE_SPPED_TEST" ]; then
-        create_and_format_data_img
-    else
-        echo "USB Writing Speed Test ..."
+    if [ -z "$SKIP_WRITE_SPEED_TEST" ]; then
+        echo "Writing Speed Test ..."
         SPEEDRESULT=`dd if=/dev/zero bs=1M count=100 of=/mnt/$SRC/speedtest conv=fsync 2>&1`
         rm /mnt/$SRC/speedtest
         SPEED=`echo $SPEEDRESULT | sed -n "s/^.*, \([0-9.]\+\)MB\/s/\1/p"`
         if [ -n "$SPEED" ]; then
-            echo "USB Writing Speed: $SPEED MB/s"
+            echo "Writing Speed: $SPEED MB/s"
             if [ $(awk "BEGIN{ print (0$SPEED<$MIN_SPEED)?1:0 }") = 1 ] ; then
-                echo "USB with writing speed lower than ${MIN_SPEED} MB/s detected. System may fail to boot up. To continue, press any key." 
+                echo "with writing speed lower than ${MIN_SPEED} MB/s detected. System may fail to boot up. To continue, press Enter."
                 read
             fi
-            create_and_format_data_img
         else
-            echo "Cannot detect the USB writing speed. System may fail to boot up. To continue, press any key."
+            echo "Cannot detect the writing speed. System may fail to boot up. To continue, press Enter."
             read
-            create_and_format_data_img
         fi
     fi
 
@@ -36,8 +32,32 @@ initialize_data_img()
 
 create_and_format_data_img()
 {
-    echo "Initialize Data Partition, please be patient ..."
-    dd if=/dev/zero bs=1M count=4095 | pv -s 4095m | dd of=/mnt/$SRC/data.img
+    AVAIL=`df -m /mnt|grep /mnt|awk '{print $4}'`
+    if [ $AVAIL -le 500 ]; then
+        echo "Not enough space to create Data Partition. Unable to use Persistent Mode, to continue, press Enter."
+        read
+        return
+    fi
+    FILESYSTEMTYPE=`mount|grep /mnt|awk '{print $5}'`
+    if [ "$FILESYSTEMTYPE" = "fuseblk" ]; then
+        if [ $AVAIL -ge 16384 ]; then
+            let SIZE=8192
+        else
+            let SIZE=$AVAIL/2
+        fi
+    else
+        if [ $AVAIL -ge 8190 ]; then
+            let SIZE=4095
+        else
+            let SIZE=$AVAIL/2
+        fi
+    fi
+    echo "Initialize ${SIZE}MB Data Partition, please be patient ..."
+    if [ -x system/bin/sh ]; then
+        system/bin/sh -c "dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=/mnt/$SRC/data.img" 2>&1
+    else
+        dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=/mnt/$SRC/data.img
+    fi
     echo "Format Data Partition ..."
     mke2fs -F -t ext4 /mnt/$SRC/data.img
 }
@@ -50,7 +70,8 @@ mount_data()
     if [ -n "$CREATE_DATA_IMG" ]; then
         remount_rw
         if [ ! -s /mnt/$SRC/data.img ]; then
-            initialize_data_img
+            write_speed_test
+            create_and_format_data_img
             INITIALIZE=true
         fi
         echo "Checking Data Partition ..."
@@ -58,6 +79,20 @@ mount_data()
         mount -o loop /mnt/$SRC/data.img data
         if [ "$INITIALIZE" = "true" ]; then
             touch data/initialize_flag
+        fi
+    elif [ -n "$USB_DATA_PARTITION" ]; then
+        device=$(blkid | grep 'REMIXOSDATA')
+        if [ -z "$device"  ]; then
+            device=$(blkid | grep 'REMIXOSSYS' | awk '{print $1}' | sed -n 's/2:/3/;1p')
+            echo "Format Data Partition ..."
+            mke2fs -F -t ext4 -L "REMIXOSDATA" $device
+        else
+            device=$(blkid | grep 'REMIXOSDATA' | awk '{print $1}' | sed -n 's/://;1p')
+        fi
+        blk=`basename $device`
+        if [ -b "/dev/$blk" ]; then
+            [ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
+            mount -t ext4 /dev/block/$blk data
         fi
     elif [ -n "$DATA_IN_MEM" ]; then
         mount -t tmpfs tmpfs data
@@ -72,7 +107,7 @@ mount_data()
         mount -o loop /mnt/$SRC/data.img data
     else
         device_mount_data || mount -t tmpfs tmpfs data
-            fi
+    fi
 }
 
 mount_sdcard()
