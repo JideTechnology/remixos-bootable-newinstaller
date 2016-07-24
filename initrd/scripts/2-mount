@@ -32,54 +32,78 @@ write_speed_test()
 
 create_and_format_data_img()
 {
-    AVAIL=`df -m /mnt|grep /mnt|awk '{print $4}'`
-    if [ $AVAIL -le 500 ]; then
-        echo "Not enough space to create Data Partition. Unable to use Persistent Mode, to continue, press Enter."
-        read
-        return
-    fi
-    FILESYSTEMTYPE=`mount|grep /mnt|awk '{print $5}'`
-    if [ "$FILESYSTEMTYPE" = "fuseblk" ]; then
-        if [ $AVAIL -ge 16384 ]; then
-            let SIZE=8192
+    INITIALIZE=false
+    data_image=/mnt/$SRC/data.img
+    unformatted_data_image=/mnt/$SRC/unformatted_data.img
+
+    if [ ! -f $data_image ]; then
+        write_speed_test
+        if [ -f $unformatted_data_image ]; then
+            mv $unformatted_data_image $data_image
         else
-            let SIZE=$AVAIL/2
+            AVAIL=`df -m /mnt|grep /mnt|awk '{print $4}'`
+            if [ $AVAIL -le 500 ]; then
+                echo "Not enough space to create Data Partition. Unable to use Persistent Mode, to continue, press Enter."
+                read
+                return
+            fi
+            FILESYSTEMTYPE=`mount|grep /mnt|awk '{print $5}'`
+            if [ "$FILESYSTEMTYPE" = "fuseblk" ]; then
+                if [ $AVAIL -ge 16384 ]; then
+                    let SIZE=8192
+                else
+                    let SIZE=$AVAIL/2
+                fi
+            else
+                if [ $AVAIL -ge 8190 ]; then
+                    let SIZE=4095
+                else
+                    let SIZE=$AVAIL/2
+                fi
+            fi
+            echo "Initialize ${SIZE}MB Data Partition, please be patient ..."
+            if [ -x system/bin/sh ]; then
+                system/bin/sh -c "dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=${data_image} bs=1M" 2>&1
+            else
+                dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=$data_image bs=1M
+            fi
         fi
-    else
-        if [ $AVAIL -ge 8190 ]; then
-            let SIZE=4095
-        else
-            let SIZE=$AVAIL/2
-        fi
+        echo "Formatting data partition, please wait for a moment ..."
+        mke2fs -F -t ext4 $data_image &>/tmp/format.log
+        cat /tmp/format.log
+        INITIALIZE=true
     fi
-    echo "Initialize ${SIZE}MB Data Partition, please be patient ..."
-    if [ -x system/bin/sh ]; then
-        system/bin/sh -c "dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=/mnt/$SRC/data.img" 2>&1
-    else
-        dd if=/dev/zero bs=1M count=$SIZE | pv -s ${SIZE}m | dd of=/mnt/$SRC/data.img
+
+    mount -o loop,noatime,nodiratime $data_image data
+    if [ "$INITIALIZE" = "true" ]; then
+        touch data/initialize_flag
     fi
-    echo "Format Data Partition ..."
-    mke2fs -F -t ext4 /mnt/$SRC/data.img
+}
+
+check_data_partition()
+{
+	if [ -n "$DEBUG" ]; then
+		echo "Checking Data Partition ..."
+		e2fsck -t -p $1
+		e2fsck -t -y $1
+	else
+		e2fsck -t -p $1 > /dev/null
+		e2fsck -t -y $1 > /dev/null
+	fi
 }
 
 mount_data()
 {
-    INITIALIZE=false
     mountpoint -q data && return
+    if [ -n "$OPTIHDD" ]; then
+        MOUNT_OPTION=noatime,nodiratime,data=writeback,commit=20,barrier=0
+    else
+        MOUNT_OPTION=noatime,nodiratime
+    fi
     [ -n "$DATA" ] && blk=`basename $DATA` || blk=
     if [ -n "$CREATE_DATA_IMG" ]; then
         remount_rw
-        if [ ! -s /mnt/$SRC/data.img ]; then
-            write_speed_test
-            create_and_format_data_img
-            INITIALIZE=true
-        fi
-        echo "Checking Data Partition ..."
-        e2fsck -p -y /mnt/$SRC/data.img
-        mount -o loop /mnt/$SRC/data.img data
-        if [ "$INITIALIZE" = "true" ]; then
-            touch data/initialize_flag
-        fi
+        create_and_format_data_img
     elif [ -n "$USB_DATA_PARTITION" ]; then
         device=$(blkid | grep 'REMIXOSDATA')
         if [ -z "$device"  ]; then
@@ -92,19 +116,22 @@ mount_data()
         blk=`basename $device`
         if [ -b "/dev/$blk" ]; then
             [ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
-            mount -t ext4 /dev/block/$blk data
+            check_data_partition /dev/block/$blk
+            mount -t ext4 -o $MOUNT_OPTION /dev/block/$blk data
         fi
     elif [ -n "$DATA_IN_MEM" ]; then
         mount -t tmpfs tmpfs data
     elif [ -b "/dev/$blk" ]; then
         [ ! -e /dev/block/$blk ] && ln /dev/$blk /dev/block
-        mount /dev/block/$blk data
+        check_data_partition /dev/block/$blk
+        mount -o $MOUNT_OPTION /dev/block/$blk data
     elif [ -d /mnt/$SRC/data ]; then
         remount_rw
         mount --bind /mnt/$SRC/data data
     elif [ -f /mnt/$SRC/data.img ]; then
         remount_rw
-        mount -o loop /mnt/$SRC/data.img data
+        check_data_partition /mnt/$SRC/data.img
+        mount -o loop,$MOUNT_OPTION /mnt/$SRC/data.img data
     else
         device_mount_data || mount -t tmpfs tmpfs data
     fi

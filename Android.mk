@@ -27,35 +27,12 @@ VER ?= $(shell date +"%F")
 
 # use squashfs for iso, unless explictly disabled
 ifneq ($(USE_SQUASHFS),0)
-MKSQUASHFS = $(shell which mksquashfs)
+MKSQUASHFS := $(MAKE_SQUASHFS)
 
 define build-squashfs-target
-	$(if $(shell $(MKSQUASHFS) -version | grep "version [0-3].[0-9]"),\
-		$(error Your mksquashfs is too old to work with kernel 2.6.29. Please upgrade to squashfs-tools 4.0))
-	$(hide) $(MKSQUASHFS) $(1) $(2) -noappend
+	$(hide) $(MKSQUASHFS) $(1) $(2) -noappend -comp gzip
 endef
 endif
-
-define check-density
-	eval d=$$(grep ^ro.sf.lcd_density $(INSTALLED_DEFAULT_PROP_TARGET) $(INSTALLED_BUILD_PROP_TARGET) | sed 's|\(.*\)=\(.*\)|\2|'); \
-	[ -z "$$d" ] || ( awk -v d=$$d ' BEGIN { \
-		if (d <= 180) { \
-			label="liveh"; dpi="HDPI"; \
-		} else { \
-			label="livem"; dpi="MDPI"; \
-		} \
-	} { \
-		if (match($$2, label)) \
-			s=5; \
-		else if (match($$0, dpi)) \
-			s=4; \
-		else \
-			s=0; \
-		for (i = 0; i < s; ++i) \
-			getline; \
-		gsub(" DPI=[0-9]*",""); print $$0; \
-	}' $(1) > $(1)_ && mv $(1)_ $(1) )
-endef
 
 initrd_dir := $(LOCAL_PATH)/initrd
 initrd_bin := \
@@ -63,12 +40,8 @@ initrd_bin := \
 	$(wildcard $(initrd_dir)/*/*)
 
 systemimg  := $(PRODUCT_OUT)/system.$(if $(MKSQUASHFS),sfs,img)
+$(if $(MKSQUASHFS),$(systemimg): | $(MKSQUASHFS))
 signedsystemimg  :=  $(PRODUCT_OUT)/signed/system.$(if $(MKSQUASHFS),sfs,img)
-dataimg  := $(PRODUCT_OUT)/data.img
-
-$(dataimg):
-	dd if=/dev/zero of=$@ bs=1M count=1 seek=1024
-	mkfs.ext4 -F -j $@
 
 INITRD_RAMDISK := $(PRODUCT_OUT)/initrd.img
 $(INITRD_RAMDISK): $(initrd_bin) $(systemimg) $(TARGET_INITRD_SCRIPTS) | $(ACP) $(MKBOOTFS)
@@ -76,36 +49,71 @@ $(INITRD_RAMDISK): $(initrd_bin) $(systemimg) $(TARGET_INITRD_SCRIPTS) | $(ACP) 
 	$(ACP) -pr $(initrd_dir) $(TARGET_INSTALLER_OUT)
 	$(if $(TARGET_INITRD_SCRIPTS),$(ACP) -p $(TARGET_INITRD_SCRIPTS) $(TARGET_INSTALLER_OUT)/scripts)
 	ln -s /bin/ld-linux.so.2 $(TARGET_INSTALLER_OUT)/lib
+	mkdir -p $(TARGET_INSTALLER_OUT)/sbin/
+	ln -s /bin/ntfs-3g $(TARGET_INSTALLER_OUT)/sbin/mount.ntfs-3g
 	mkdir -p $(addprefix $(TARGET_INSTALLER_OUT)/,android iso mnt proc sys tmp sfs hd)
 	echo "VER=$(VER)" > $(TARGET_INSTALLER_OUT)/scripts/00-ver
 	$(MKBOOTFS) $(TARGET_INSTALLER_OUT) | gzip -9 > $@
 
+install_path := $(PRODUCT_OUT)/install
+
 INSTALL_RAMDISK := $(PRODUCT_OUT)/install.img
 $(INSTALL_RAMDISK): $(wildcard $(LOCAL_PATH)/install/*/* $(LOCAL_PATH)/install/*/*/*/*) | $(MKBOOTFS)
 	$(if $(TARGET_INSTALL_SCRIPTS),$(ACP) -p $(TARGET_INSTALL_SCRIPTS) $(TARGET_INSTALLER_OUT)/scripts)
-	$(MKBOOTFS) $(dir $(dir $(<D))) | gzip -9 > $@
+	rm -rf $(install_path)
+	$(ACP) -pr bootable/newinstaller/install $(PRODUCT_OUT)
+ifdef REMIXOS_SYS_GB
+	echo "REMIXOS_SYS_GB=$(REMIXOS_SYS_GB)" > $(install_path)/scripts/5-preinstall
+	cat bootable/newinstaller/install/scripts/5-preinstall >> $(install_path)/scripts/5-preinstall
+endif
+ifdef INSTALLED_KERNEL_CMDLINE
+	sed "s|INSTALLED_CMDLINE|$(INSTALLED_KERNEL_CMDLINE)|" bootable/newinstaller/install/scripts/6-creategrub > $(install_path)/scripts/6-creategrub
+endif
+	$(MKBOOTFS) $(install_path) | gzip -9 > $@
 
+ifdef INSTALLED_KERNEL_CMDLINE
+CREATE_GRUB := $(PRODUCT_OUT)/create_grub
+$(CREATE_GRUB):
+	sed "s|INSTALLED_CMDLINE|$(INSTALLED_KERNEL_CMDLINE)|" bootable/newinstaller/install/scripts/6-creategrub > $@
+else
+CREATE_GRUB :=
+endif
+
+TARGET_EFI_ARCH ?= $(TARGET_ARCH)
 boot_dir := $(PRODUCT_OUT)/boot
 efi_remixos_dir := $(boot_dir)/efi/RemixOS
 efi_boot_dir := $(boot_dir)/efi/boot
+efi_grub_dir := $(boot_dir)/boot/grub
+isolinux_dir := $(boot_dir)/isolinux
 efi_ia32_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*ia32.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*32.mod)
 efi_x64_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*x64.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*64.mod)
 efi_x64_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub64.cfg
 efi_ia32_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub32.cfg
-efi_boot_grub :=$(LOCAL_PATH)/boot/efi/boot/grub.cfg
-$(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/*) $(systemimg) $(GENERIC_X86_CONFIG_MK) | $(ACP)
+ifdef GRUB2_CFG
+	efi_boot_grub :=$(GRUB2_CFG)
+else
+	efi_boot_grub :=$(LOCAL_PATH)/boot/boot/grub/grub.cfg
+endif
+
+$(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/* $(efi_boot_grub)) $(systemimg) $(INSTALL_RAMDISK) $(GENERIC_X86_CONFIG_MK) | $(ACP)
 	$(hide) rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
 	$(hide) mkdir -p $(efi_remixos_dir)
 	$(hide) mkdir -p $(efi_boot_dir)
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_boot_grub) > $(efi_boot_dir)/grub.cfg
-ifeq ($(TARGET_ARCH),x86)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_boot_grub) > $(efi_grub_dir)/grub.cfg
+ifdef ISOLINUX_CFG
+	$(hide) cp $(ISOLINUX_CFG) $(isolinux_dir)
+endif
 	$(hide) cp $(efi_ia32_files) $(efi_remixos_dir)
 	$(hide) cp $(efi_ia32_files) $(efi_boot_dir)
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub.cfg
-else
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub32.cfg
 	$(hide) cp $(efi_x64_files) $(efi_remixos_dir)
 	$(hide) cp $(efi_x64_files) $(efi_boot_dir)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_x64_grub) > $(efi_remixos_dir)/grub64.cfg
+	@echo arch=$(TARGET_EFI_ARCH) > $(boot_dir)/info.ini
+ifeq ($(TARGET_EFI_ARCH),x86)
+	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub.cfg
+else
 	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_x64_grub) > $(efi_remixos_dir)/grub.cfg
 endif
 
@@ -117,29 +125,18 @@ BUILT_IMG := $(BUILT_IMG_MIN) $(if $(BUILD_SIGNED_IMG), $(signedsystemimg), $(sy
 ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).iso
 $(ISO_IMAGE): $(boot_dir) $(BUILT_IMG)
 	@echo ----- Making iso image ------
-	$(hide) $(call check-density,$</isolinux/isolinux.cfg)
 	$(hide) sed -i "s|\(Installation CD\)\(.*\)|\1 $(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
+	$(hide) sed -i "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</boot/grub/grub.cfg
 	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
-		-no-emul-boot -boot-load-size 4 -boot-info-table \
+		-no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot \
 		-input-charset utf-8 -V "Android-x86 LiveCD" -o $@ $^
-	$(hide) isohybrid $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
-	@echo -e "\n\n$@ is built successfully.\n\n"
-
-MIN_ISO_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT)_min.iso
-$(MIN_ISO_IMAGE): $(boot_dir) $(BUILT_IMG_MIN)
-	@echo ----- Making minimal iso image ------
-	$(hide) $(call check-density,$</isolinux/isolinux.cfg)
-	$(hide) sed -i "s|\(Installation CD\)\(.*\)|\1 $(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $</isolinux/isolinux.cfg
-	genisoimage -vJURT -b isolinux/isolinux.bin -c isolinux/boot.cat \
-		-no-emul-boot -boot-load-size 4 -boot-info-table \
-		-input-charset utf-8 -V "Android-x86 LiveCD" -o $@ $^
-	$(hide) isohybrid $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
+	$(hide) isohybrid --uefi $@ || echo -e "isohybrid not found.\nInstall syslinux 4.0 or higher if you want to build a usb bootable iso."
 	@echo -e "\n\n$@ is built successfully.\n\n"
 
 # Note: requires dosfstools
 EFI_IMAGE := $(PRODUCT_OUT)/$(TARGET_PRODUCT).img
 ESP_LAYOUT := $(LOCAL_PATH)/editdisklbl/esp_layout.conf
-$(EFI_IMAGE): $(wildcard $(LOCAL_PATH)/boot/efi/*/*) $(BUILT_IMG) $(ESP_LAYOUT) | $(edit_mbr)
+$(EFI_IMAGE): $(wildcard $(LOCAL_PATH)/boot/boot/*/*) $(BUILT_IMG) $(ESP_LAYOUT) | $(edit_mbr)
 	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(<D)/grub.cfg > $(@D)/grub.cfg
 	$(hide) size=0; \
 	for s in `du --apparent-size -sk $^ | awk '{print $$1}'`; do \
@@ -148,7 +145,8 @@ $(EFI_IMAGE): $(wildcard $(LOCAL_PATH)/boot/efi/*/*) $(BUILT_IMG) $(ESP_LAYOUT) 
 	size=$$(($$(($$(($$(($$(($$size + $$(($$size / 100)))) - 1)) / 32)) + 1)) * 32)); \
 	rm -f $@.fat; mkdosfs -n Android-x86 -C $@.fat $$size
 	$(hide) mcopy -Qsi $@.fat $(<D)/../../../install/grub2/efi $(BUILT_IMG) ::
-	$(hide) mcopy -Qoi $@.fat $(@D)/grub.cfg ::efi/boot
+	$(hide) mmd -i $@.fat ::boot; mmd -i $@.fat ::boot/grub
+	$(hide) mcopy -Qoi $@.fat $(@D)/grub.cfg ::boot/grub
 	$(hide) cat /dev/null > $@; $(edit_mbr) -l $(ESP_LAYOUT) -i $@ esp=$@.fat
 	$(hide) rm -f $@.fat
 

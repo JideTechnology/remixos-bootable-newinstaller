@@ -1,0 +1,177 @@
+#example: mount_hd sda
+#REMIXOS_SYS_GB
+get_hd()
+{
+    inst_hd=`mount | grep /mnt | awk '{ print $1 }' | xargs basename | sed "s/[0-9]$//g"`
+    echo "inst_hd: $inst_hd"
+
+    lsblk=`ls /sys/block | grep -v -E "loop|ram|sr|boot|rpmb"`
+    for d in $lsblk; do
+	if [ $d != $inst_hd ]; then
+	    select_hd=$d
+	fi
+    done
+    echo "select_hd: $select_hd"
+
+    if ［ -z $select_hd ］; then
+	dialog --title " Error " --msgbox "\n No hard disk is found!" 7 40
+	install_failed=yes
+    fi
+
+}
+
+#example: mount_hd sda
+mount_hd()
+{
+    mountpoint -q /hd && umount /hd
+    try_mount rw /dev/$1 /hd
+    return $?
+}
+
+#example: delete_all_partitions sda
+delete_all_partitions()
+{
+    dd if=/dev/zero of=/dev/${1} bs=2048 count=1 conv=notrunc
+}
+
+#example: create_gpr_partitions sda
+create_gpt_partitions()
+{
+    delete_all_partitions $1
+
+    # default system size : 10GB
+    [ -z $REMIXOS_SYS_GB ] && REMIXOS_SYS_GB=10
+    REMIXOS_SYS_BLOCK=`expr $REMIXOS_SYS_GB \* 1024 \* 1024 \* 2`
+    REMIXOS_DATA_BEGIN=`expr $REMIXOS_SYS_BLOCK + 204834`
+
+    ln /dev/block/${1} /dev/block/mmcblk0
+
+    gpt_tables=/tmp/gpt.tbl
+    cat <<EOF > $gpt_tables
+partition_table=gpt
+create -z /dev/block/mmcblk0
+create /dev/block/mmcblk0
+boot -p /dev/block/mmcblk0
+reload /dev/block/mmcblk0
+add -b 34 -s 204800 -t efi -u 80868086-8086-8086-8086-000000000000 -l EFI -T 0 -P 0 /dev/block/mmcblk0
+add -b 204834 -s $REMIXOS_SYS_BLOCK -t data -u 80868086-8086-8086-8086-000000000001 -l system -T 0 -P 0 /dev/block/mmcblk0
+add -b $REMIXOS_DATA_BEGIN -s \$calc(\$lba_end-16384) -t data -u 80868086-8086-8086-8086-000000000002 -l data -T 0 -P 0 /dev/block/mmcblk0
+reload /dev/block/mmcblk0
+EOF
+
+    gfdisk $gpt_tables
+    if [ $? -ne 0 ]; then
+	install_failed=yes
+	dialog --title " Error " --msgbox "\n Couldn't create GPT partitions!" 7 33
+	return 1
+    fi
+
+    while [ ! -e /dev/${1}3 ]; do
+        sleep 1
+    done
+    mkfs.vfat -n REMIXOS.EFI /dev/${1}1
+    mke2fs -t ext4 -E lazy_itable_init=0,lazy_journal_init=0 /dev/${1}2
+    mke2fs -t ext4 -E lazy_itable_init=0,lazy_journal_init=0 /dev/${1}3
+
+    remixos_boot=${1}1
+    remixos_sys=${1}2
+    remixos_data=${1}3
+
+    return 0
+}
+
+install_grub2()
+{
+    mount_hd $remixos_boot
+    if [ $? -ne 0 ]; then
+	install_failed=yes
+	dialog --title " Error " --msgbox "\n Couldn't mount boot partition!" 7 40
+	return 1
+    fi
+
+    mkdir -p /hd/efi/boot
+    cp -f /grub2/efi/boot/bootx64.efi /hd/efi/boot
+    cp -f /grub2/efi/boot/grubx64.efi /hd/efi/boot
+    mkdir -p /hd/boot/grub
+    grubcfg=/hd/boot/grub/grub.cfg
+    write_grub_file $grubcfg $asrc /dev/$remixos_data /dev/$remixos_sys
+    return 0
+}
+
+install_sys()
+{
+    mount_hd $remixos_sys
+    if [ $? -ne 0 ]; then
+	install_failed=yes
+	dialog --title " Error " --msgbox "\n Couldn't mount system partition!" 7 40
+	return 1
+    fi
+
+    files="mnt/$SRC/kernel mnt/$SRC/initrd.img mnt/$SRC/ramdisk.img"
+
+    if [ -n "$DEBUG" ]; then
+        sysimg="android/system"
+        files="$files $sysimg"
+    else
+        if [ -e "mnt/$SRC/system.sfs" ]; then
+            files="$files mnt/$SRC/system.sfs"
+        else
+            files="$files mnt/$SRC/system.img"
+        fi
+    fi
+
+
+    size=0
+    for s in `du -sk $files | awk '{print $1}'`; do
+	size=$(($size+$s))
+    done
+
+    mkdir -p hd/$asrc
+    cd hd/$asrc
+
+    rm -rf system*
+    ( ( cd /; find $files | $CPIO -H newc -o ) | pv -ns ${size}k | ( $CPIO -iud > /dev/null; echo $? > /tmp/result )) 2>&1 \
+	| progress_bar "Installing Remix OS" "Expect to write $size KB..."
+    result=$((`cat /tmp/result`*255))
+
+    if [ $result -eq 0 ]; then
+	for d in android mnt sfs ./$SRC; do
+		[ -d $d ] && mv $d/* . && rmdir $d
+	done
+	chown 0.0 *
+	for f in *; do
+		[ -d $f ] || chmod 644 $f
+	done
+    fi
+
+    dialog --infobox "\n Synchronizing data to disk..." 5 40
+    sync
+
+    return 0
+}
+
+#example: install_hdd
+install_gpt_hdd()
+{
+    cd /
+    asrc=RemixOS
+    install_grub2 && install_sys
+}
+
+do_preinstall()
+{
+    echo "do_preinstall"
+
+    get_hd
+
+    if [ -n $select_hd ]; then
+	create_gpt_partitions $select_hd && install_gpt_hdd && dialog --title " Congratulations! " --msgbox "\n Remix OS has been installed successfully. \n" 7 50
+    fi
+
+    [ $install_failed = "yes" ] && dialog --title " Error " --msgbox "\n RemixOS installation failed. \n" 7 42
+
+    sync
+    umount -a
+    sync
+    poweroff -f
+}

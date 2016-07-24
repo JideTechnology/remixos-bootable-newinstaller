@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2016/01/23
+# Last updated 2016/03/03
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -8,56 +8,56 @@
 #
 
 # An auto detect function provided by kinneko
-auto_detect()
+get_modalias()
 {
-	tmp=/tmp/dev2mod
-	echo 'dev2mod() { while read dev; do case $dev in' > $tmp
-	sort -r /lib/modules/`uname -r`/modules.alias | \
-		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)modprobe \2;;/p' >> $tmp
-	echo 'esac; done; }' >> $tmp
-	sed -i '/brcmfmac/d' $tmp
-	sed -i '/bcma/d' $tmp
-	source $tmp
-	cat /sys/bus/*/devices/*/modalias | dev2mod
-	cat /sys/devices/virtual/wmi/*/modalias | dev2mod
-    cat /sys/bus/*/devices/*/uevent|grep MODALIAS|sed 's/^MODALIAS=//'|sort -u | dev2mod
+	MODALIAS_TMP=/tmp/modalias
+	if [ ! -e $MODALIAS_TMP ]; then
+		cat /sys/bus/*/devices/*/uevent | grep MODALIAS | sed 's/^MODALIAS=//'  > $MODALIAS_TMP
+		cat /sys/devices/virtual/wmi/*/modalias >> $MODALIAS_TMP
+		cat /sys/bus/*/devices/*/uevent|grep MODALIAS|sed 's/^MODALIAS=//' >> $MODALIAS_TMP
+	fi
+	awk '!seen[$0]++' $MODALIAS_TMP
 }
 
-find_network_dev_name()
+get_device_hash()
 {
-	INITRC=init.x86.rc
-	DHCPCD="/system/bin/dhcpcd -o domain_name_servers"
-	rmline=`grep -n "#REMOVE FROM HERE" $INITRC | cut -d':' -f1`
-	rmline=`expr $rmline + 1`
-	sed -i -e "$rmline,\$d" $INITRC
-	for netdev in `ls /sys/class/net`; do
-		case "$netdev" in
-			lo|ip6tnl*|sit*|tun*|eth0|wlan0|wmaster*)
-				;;
-			*)
-				echo -e "\nservice dhcpcd_$netdev $DHCPCD -ABDKL\n    class main\n    disabled\n    oneshot\n" >> $INITRC
-				echo -e "service iprenew_$netdev $DHCPCD -n\n    class main\n    disabled\n    oneshot" >> $INITRC
-				;;
-		esac
-	done
+	get_modalias|md5sum|awk '{print $1}'
+}
+
+auto_detect()
+{
+	DEVICE_HASH=$(get_device_hash)
+	CACHE_FILE=cached_auto_detect_${DEVICE_HASH}.sh
+	if [ -e /android/data/local/$CACHE_FILE ]; then
+		awk '!seen[$0]++' /android/data/local/$CACHE_FILE | /system/bin/sh
+	else
+		tmp=/tmp/dev2mod
+		mkdir -p /android/data/local
+		echo > /android/data/local/${CACHE_FILE}
+		echo 'dev2mod() { while read dev; do case $dev in' > $tmp
+		sort -r /lib/modules/`uname -r`/modules.alias | \
+		sed -n 's/^alias  *\([^ ]*\)  *\(.*\)/\1)echo modprobe \2>>\/android\/data\/local\/'$CACHE_FILE'; modprobe \2;;/p' >> $tmp
+		echo 'esac; done; }' >> $tmp
+
+		sed -i '/brcmfmac/d' $tmp
+		sed -i '/bcma/d' $tmp
+
+		# prefer r8168 over r8169
+		sed -i '/pci:v00001186d00004300sv00001186sd00004B10bc\*sc\*i\*)modprobe r8169/d' $tmp
+		sed -i '/pci:v000010ECd00008168sv\*sd\*bc\*sc\*i\*)modprobe r8169/d' $tmp
+		source $tmp
+		get_modalias | dev2mod
+	fi
 }
 
 load_modules()
 {
-	if [ -n "$FOUND" ]; then
-		[ -n "$PREDEV" ] && modprobe $PREDEV
-		[ -n "$FB0DEV" -a -z "$UVESA_MODE" ] && modprobe $FB0DEV
-		[ -n "$LANDEV" ] && modprobe $LANDEV
-		[ -n "$WIFDEV" ] && modprobe $WIFDEV
-		[ -n "$SNDDEV" ] && modprobe $SNDDEV
-		[ -n "$CAMDEV" ] && modprobe $CAMDEV
-	else
+	if [ -z "$FOUND" ]; then
 		auto_detect
 	fi
 
 	# 3G modules
-	EXTMOD="$EXTMOD pppoe ppp-async ppp-deflate bsd-comp"
 	for m in $EXTMOD; do
-		modprobe $m
+		busybox modprobe $m
 	done
 }

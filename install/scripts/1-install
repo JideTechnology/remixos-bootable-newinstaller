@@ -114,20 +114,26 @@ progress_bar()
 	dialog --clear --title " $1 " --gauge "\n $2" 8 70
 }
 
+convert_fs()
+{
+	if blkid /dev/$1 | grep -q ext2; then
+		/system/bin/tune2fs -j /dev/$1
+		e2fsck -fy /dev/$1
+	fi
+	if blkid /dev/$1 | grep -q ext3; then
+		/system/bin/tune2fs -O extents,uninit_bg /dev/$1
+		e2fsck -fy /dev/$1
+	fi
+}
+
 format_fs()
 {
 	local cmd
-	echo -e '"Do not format" ""\next4 ""\next3 ""\next2 ""\nntfs ""\nfat32 ""' > $menufile
+	echo -e '"Do not format" ""\next4 ""\nntfs ""\nfat32 ""' > $menufile
 	choose "Choose filesystem" "Please select a filesystem to format $1:"
 	case "$choice" in
 		ext4)
 			cmd="make_ext4fs -L"
-			;;
-		ext3)
-			cmd="mke2fs -jL"
-			;;
-		ext2)
-			cmd="mke2fs -L"
 			;;
 		ntfs)
 			cmd="mkntfs -fL"
@@ -147,6 +153,10 @@ format_fs()
 			if (match($0, "done"))
 				printf("%d\n", i+=33)
 		}' | progress_bar "Formatting" "Formatting partition $1..."
+	elif blkid /dev/$1 | grep -q ext[23]; then
+		dialog --clear --title " Warning " --yesno \
+			"\nYou chose to install android-x86 to an ext2/3 filesystem. We suggest you convert it to ext4 for better reliability and performance." 9 62
+		[ $? -eq 0 ] && convert_fs $1
 	fi
 }
 
@@ -184,6 +194,17 @@ create_winitem()
 	fi
 }
 
+check_data_img()
+{
+	losetup /dev/loop7 data.img
+	if blkid /dev/loop7 | grep -q ext[23]; then
+		dialog --clear --title " Warning " --yesno \
+			"\nYour data.img is an ext2/3 filesystem. We suggest you convert it to ext4 for better reliability." 8 58
+		[ $? -eq 0 ] && convert_fs loop7
+	fi
+	losetup -d /dev/loop7
+}
+
 create_img()
 {
 	bname=`basename $2`
@@ -194,9 +215,9 @@ create_img()
 		rm -f $2
 	fi
 	dialog --title " Question " --nook --nocancel --inputbox \
-		"\nPlease input the size of the $bname in MB (max 2047):" 8 63 $1 2> $tempfile
+		"\nPlease input the size of the $bname in MB:" 8 63 $1 2> $tempfile
 	size=`cat $tempfile`
-	[ 0$size -le 0 -o 0$size -gt 2047 ] && size=2047
+	[ 0$size -le 0 ] && size=1024
 	( dd bs=1M count=$size if=/dev/zero | pv -ns ${size}m | dd of=$2 ) 2>&1 \
 		| progress_bar "Creating $bname" "Expect to write $size MB..."
 }
@@ -221,7 +242,7 @@ create_data_img()
 try_upgrade()
 {
 	[ -d $1 ] && return
-	PREV_VERS="4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	PREV_VERS="6.0-rc1 5.1-rc1 4.4-r5 4.4-r4 4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
 	for v in $PREV_VERS; do
 		prev=hd/android-$v
 		if [ -d $prev ]; then
@@ -286,17 +307,23 @@ install_to()
 	if [ $? -eq 0 ]; then
 		get_part_info $1
 		for i in /sys/block/$disk/$disk*; do
-			[ 0`cat $i/partition` -eq 1 ] && break
+			[ 0`cat $i/partition` -eq 1 ] && b=$i
+			[ $(blkid /dev/`basename $i` | grep -c vfat) -ne 0 ] && b=$i && break
 		done
-		boot=`basename $i`
+		boot=`basename $b`
 		mountpoint -q /hd && umount /hd
 		dialog --title " Confirm " --defaultno --yesno \
 			"\n Do you want to format the boot partition\n /dev/$boot?" 8 45
 		[ $? -eq 0 ] && mkdosfs -n EFI /dev/$boot
-		try_mount rw /dev/$boot /hd
+		while [ 1 ]; do
+			try_mount rw /dev/$boot /hd && break
+			dialog --title " Confirm " --yesno \
+			"\n Cannot mount /dev/$boot\n Do you want to format it?" 8 37
+			[ $? -eq 0 ] && mkdosfs -n EFI /dev/$boot
+		done
 		cp -af /grub2/efi /hd
 		grubcfg=/hd/efi/boot/grub.cfg
-		echo -e "set timeout=6\nset gfxmode=1024x768\nterminal_output gfxterm\n\n" > $grubcfg
+		echo -e "set timeout=6\n\n" > $grubcfg
 		echo -e "menuentry \"Remix OS $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel quiet $cmdline \n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
 		echo -e "menuentry \"Remix OS $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel $cmdline DEBUG=2\n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
 		if [ -e /hd/EFI/Microsoft/Boot/bootmgfw.efi ]; then
@@ -344,7 +371,7 @@ install_to()
 
 		case "$fs" in
 			vfat|fuseblk)
-				create_data_img
+				[ -e data.img ] && check_data_img || create_data_img
 				;;
 			*)
 				mkdir -p data

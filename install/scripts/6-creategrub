@@ -1,0 +1,13 @@
+# write_grub_file $grubcfg $asrc $remixos_data $remixos_sys
+write_grub_file()
+{
+    cat <<EOF > $1
+set timeout=1
+
+menuentry "Remix OS" {
+    search.file /$2/kernel root
+    linux /$2/kernel INSTALLED_CMDLINE DATA=$3 ROOT=$4
+    initrd /$2/initrd.img
+}
+EOF
+}

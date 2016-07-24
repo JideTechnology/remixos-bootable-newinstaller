@@ -1,0 +1,233 @@
+# Copyright 2016 Jide Co., Ltd.
+
+init_remixos()
+{
+    check_disk_removable
+    check_ota
+    check_serialno
+    check_src
+    wipe_data_if_necessary
+    import_cid
+    import_meta
+    disable_console_keys_if_neccessary
+}
+
+disable_console_keys()
+{
+   cat <<EOF | loadkeys -q
+keymaps 0-127
+alt keycode 59 = nul
+control alt keycode 59 = nul
+alt keycode 105 = nul
+alt keycode 106 = nul
+EOF
+}
+
+disable_console_keys_if_neccessary()
+{
+    if [ -z "$ENABLE_CONSOLE_KEYS" ]; then
+        disable_console_keys
+    fi
+}
+
+wipe_data_if_necessary()
+{
+    WIPE_DATA_IN_INIT_CMD_FILE="data/system/wipe_data_in_init.cmd"
+    LOG_FILE=/mnt/$SRC/wipe_log
+    clear_log_file
+    if [ -e "$WIPE_DATA_IN_INIT_CMD_FILE" ]; then
+        command=$(cat $WIPE_DATA_IN_INIT_CMD_FILE)
+        log_string "wipe command: $command"
+        rm -f $WIPE_DATA_IN_INIT_CMD_FILE
+        if [ $command = "all" ]; then
+            wipe_all_data
+        elif [ $command = "without_sdcard" ]; then
+            wipe_without_sdcard
+        fi
+    fi
+    pause_for_debug
+}
+
+wipe_all_data()
+{
+    data_dev=$(mountpoint -n data|awk '{print $1}')
+    log_string "data_dev: $data_dev"
+    # find the real filename for loop device
+    if losetup $data_dev > /dev/null; then
+        data_dev=$(losetup $data_dev|awk '{print $3}')
+        log_string "data_dev is loop dev, the real dev: $data_dev"
+    fi
+    umount data
+    run_cmd mke2fs -F -t ext4 -L "REMIXOSDATA" $data_dev
+    pause_for_debug
+    run_cmd reboot -f
+}
+
+wipe_without_sdcard()
+{
+    cd data
+    for s in `ls -d *`; do
+        if [ "$s" != "media" ]; then
+            run_cmd rm -rf $s
+        fi
+    done
+
+    cd media
+    for s in `ls -d *`; do
+        if [ "$s" != "0" ]; then
+            run_cmd rm -rf $s
+        fi
+    done
+    cd ../..
+}
+
+check_ota()
+{
+	remount_rw
+	if [ -e "data/media/0/autoupdater/otapackage.zip" ]; then
+		LOG_FILE=/mnt/$SRC/ota_log
+		clear_log_file
+		log_string "Start updating..."
+		if [ -e "/sfs/system.img" ]; then
+			run_cmd cp /sfs/system.img /mnt/$SRC/system.img
+		fi
+		log_string "SRC=$SRC"
+		if [ `readlink -f /mnt/$SRC` != `readlink -f /mnt` ]; then
+			run_cmd ln -sf /mnt/$SRC/ramdisk.img /mnt/ramdisk.img
+			run_cmd ln -sf /mnt/$SRC/initrd.img /mnt/initrd.img
+			run_cmd ln -sf /mnt/$SRC/kernel /mnt/kernel
+			run_cmd ln -sf /mnt/$SRC/system.img /mnt/system.img
+		fi
+		mkfifo pipe
+		tee -a $LOG_FILE < pipe &
+		x86update data/media/0/autoupdater/otapackage.zip > pipe 
+		success="$?"
+		if [ -L /mnt/ramdisk.img ]; then
+			run_cmd rm /mnt/ramdisk.img
+		fi
+		if [ -L /mnt/initrd.img ]; then
+			run_cmd rm /mnt/initrd.img
+		fi
+		if [ -L /mnt/kernel ]; then
+			run_cmd rm /mnt/kernel
+		fi
+		if [ -L /mnt/system.img ]; then
+			run_cmd rm /mnt/system.img
+		fi
+		if [ $success -eq 0 ]; then
+			# update grub2
+			grub_script=create_grub
+			log_string "grub_script=$grub_script"
+			run_cmd rm -f $grub_script
+			grub_exist=`/system/xbin/unzip -l data/media/0/autoupdater/otapackage.zip $grub_script | grep $grub_script`
+			log_string "grub_exist=$grub_exist"
+			if [ "$grub_exist" != "" ] && [ "$REMIXOS_EFI" != "" ]; then
+				run_cmd /system/xbin/unzip data/media/0/autoupdater/otapackage.zip $grub_script
+				run_cmd mkdir -p /efitmp
+				run_cmd mount $REMIXOS_EFI /efitmp/
+				source $grub_script
+				run_cmd write_grub_file /efitmp/boot/grub/grub.cfg $SRC $DATA $ROOT
+				run_cmd umount /efitmp
+				run_cmd rm -rf /efitmp
+			fi
+
+			# remove the cached auto detect script
+			run_cmd rm data/local/cached_auto_detect.sh
+			run_cmd rm data/media/0/autoupdater/otapackage.zip
+			log_string "Update successfully"
+			# PATH=/sbin:/bin:/system/bin:/system/xbin till now, but it doesn't work.
+			PATH=$PATH:/bin
+			log_string $PATH
+			if [ -e "/mnt/$SRC/system.sfs" ] && [ -e "/mnt/$SRC/system.img" ]; then
+				run_cmd umount /android/system
+				run_cmd umount /sfs
+				run_cmd rm -f /mnt/$SRC/system.sfs
+				run_cmd mksquashfs /mnt/$SRC/system.img /mnt/$SRC/system.sfs
+				if [ "$?" -eq 0 ]; then
+					run_cmd rm -f /mnt/$SRC/system.img
+				else
+					run_cmd rm -f /mnt/$SRC/system.sfs
+				fi
+			fi
+			pause_for_debug
+			log_string "Preparing to restart. Please wait ..."
+			sync
+			sleep 2
+			sync
+			sleep 2
+			sync
+			sleep 2
+			reboot -f
+		else
+			log_string "Update failed"
+			run_cmd rm data/media/0/autoupdater/otapackage.zip
+			pause_for_debug
+		fi
+	fi
+}
+clear_log_file()
+{
+	rm -f $LOG_FILE
+}
+
+log_string()
+{
+	echo $1 | tee -a $LOG_FILE
+}
+
+run_cmd()
+{
+	echo "$*" >> $LOG_FILE
+	$* 2>> $LOG_FILE | tee -a $LOG_FILE
+}
+
+pause_for_debug()
+{
+	if [ "x$DEBUG" = "x2" ]; then
+		echo "Press Enter to continue"
+		read
+	fi
+}
+
+check_disk_removable()
+{
+	DISKINFO=$(df | grep /mnt)
+	DISK=${DISKINFO:11:3}
+	cat /sys/block/$DISK/removable > data/disk_removable
+}
+
+check_serialno()
+{
+	remount_rw
+	if [ "$SERIAL" = "random" ]; then
+		if [ ! -f /mnt/$SRC/isolinux.sys ]; then
+			UUID=`cat /proc/sys/kernel/random/uuid`
+		echo ${UUID//-/} > /mnt/$SRC/isolinux.sys
+		fi
+		cat /mnt/$SRC/isolinux.sys > data/serialno
+	else
+		dmidecode -s system-serial-number > data/serialno
+	fi
+}
+
+check_src()
+{
+	SRCDIR=`readlink -f /mnt/$SRC`
+	if [ "$SRCDIR" != "/mnt" ] && [ "$SRCDIR" != "/mnt/RemixOS" ]; then
+		touch data/illegal_path
+	fi
+}
+
+import_cid()
+{
+	if [ -f /mnt/$SRC/cid.sys ]; then
+		cat /mnt/$SRC/cid.sys > data/cid
+	fi
+}
+
+import_meta()
+{
+	if [ -f /mnt/$SRC/remixos_meta.sys ]; then
+		cat /mnt/$SRC/remixos_meta.sys > data/remixos_meta.sys
+	fi
+}

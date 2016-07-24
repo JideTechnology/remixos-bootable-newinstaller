@@ -3,7 +3,7 @@
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
 # and Thorsten Glaser <tg@mirbsd.org>
 #
-# Last updated 2015/10/05
+# Last updated 2015/10/23
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -65,16 +65,44 @@ try_mount()
 		RW="nolock,$RW"
 	fi
 	# FIXME: any way to mount ntfs gracefully?
-	mount -o $RW $@ || mount.ntfs-3g -o rw,force $@
+	mount -o $RW,noatime,nodiratime $@ || mount.ntfs-3g -o rw,force,big_writes,delay_mtime,noatime,nodiratime $@
 }
+
+# region @jide
+mount_system_dev_img_if_necessary()
+{
+	if [ -n "$REMOUNT_RW" ]; then
+		[ 0$REMOUNT_RW -eq 0 ] && return
+	else
+		[ 0$removable -eq 1 ] && return
+	fi
+
+	if [ 0$REMOUNT_RW -gt 0 ] || grep -qE "ro.build.type=(userdebug|eng)" /android/system/build.prop; then
+		remount_rw
+		mount | grep /mnt | grep -q rw || return
+		if [ ! -e /mnt/$SRC/system_dev.img ]; then
+			echo "extract system.sfs to /mnt/$SRC/system_dev.img for developer to easily adb sync"
+			(( pv /sfs/system.img > /mnt/$SRC/system_dev.img )) 2>&1
+			[ $? -ne 0 ] && return
+		else
+			echo "using the existing /mnt/$SRC/system_dev.img for developer to easily adb sync"
+		fi
+		umount /android/system
+		mount -o loop,rw /mnt/$SRC/system_dev.img /android/system
+	fi
+}
+# endregion
 
 check_root()
 {
+	local r
 	if [ "`dirname $1`" = "/dev" ]; then
 		[ -e $1 ] || return 1
 		blk=`basename $1`
 		[ ! -e /dev/block/$blk ] && ln $1 /dev/block
 		dev=/dev/block/$blk
+		r=$(ls /sys/block/$blk/removable /sys/block/*/$blk/../removable 2>/dev/null)
+		[ -n "$r" ] && r=$(cat $r) || r=0
 	else
 		dev=$1
 	fi
@@ -87,6 +115,7 @@ check_root()
 	elif [ ! -e /mnt/$SRC/ramdisk.img ]; then
 		return 1
 	fi
+	removable=$r
 	zcat /mnt/$SRC/ramdisk.img | cpio -id > /dev/null
 	[ -n "$SYSTEM" ] && blk=`basename $SYSTEM` || blk=
 	if [ -b "/dev/$blk" ]; then
@@ -95,18 +124,19 @@ check_root()
 	elif [ -e /mnt/$SRC/system.sfs ]; then
 		mount -o loop /mnt/$SRC/system.sfs /sfs
 		mount -o loop,ro /sfs/system.img system
+		mount_system_dev_img_if_necessary
 	elif [ -e /mnt/$SRC/system.img ]; then
-		remount_rw
 		mount -o loop,ro /mnt/$SRC/system.img system
 	elif [ -d /mnt/$SRC/system ]; then
-		remount_rw
 		mount --bind /mnt/$SRC/system system
 	else
 		rm -rf *
 		return 1
 	fi
 	mkdir mnt
-	echo " found at $1"
+	if [ -n "$DEBUG" ]; then
+		echo " found at $1"
+	fi
 	rm /sbin/mke2fs
 	hash -r
 }
@@ -129,75 +159,9 @@ debug_shell()
 	fi
 }
 
-check_ota()
-{
-	remount_rw
-	if [ -e "data/media/0/autoupdater/otapackage.zip" ]; then
-		echo "Start updating..."
-		if [ "x$SRC" != "x" ]; then
-			ln -s /mnt/$SRC/ramdisk.img /mnt/ramdisk.img
-			ln -s /mnt/$SRC/initrd.img /mnt/initrd.img
-			ln -s /mnt/$SRC/kernel /mnt/kernel
-		fi
-		if [ -e "/sfs/system.img" ]; then
-			cp /sfs/system.img /mnt/$SRC/system.img
-		fi
-
-		if [ "x$SRC" != "x" ]; then
-			ln -s /mnt/$SRC/system.img /mnt/system.img
-		fi
-		x86update data/media/0/autoupdater/otapackage.zip
-		success="$?"
-		if [ -L /mnt/$SRC/ramdisk.img ]; then
-			rm /mnt/$SRC/ramdisk.img
-		fi
-		if [ -L /mnt/$SRC/initrd.img ]; then
-			rm /mnt/$SRC/initrd.img
-		fi
-		if [ -L /mnt/$SRC/kernel ]; then
-			rm /mnt/$SRC/kernel
-		fi
-		if [ -L /mnt/$SRC/system.img ]; then
-			rm /mnt/$SRC/system.img
-		fi
-		rm data/media/0/autoupdater/otapackage.zip
-		if [ $success -eq 0 ]; then
-			echo "Update successfully"
-			if [ -e "/mnt/$SRC/system.sfs" ]; then
-				rm -f /mnt/$SRC/system.sfs
-			fi
-			echo "Preparing to restart. Please wait ..."
-			sync
-			sleep 2
-			sync
-			sleep 2
-			sync
-			sleep 2
-			reboot -f
-		else
-			echo "Update failed"
-		fi
-	fi
-}
-
-check_disk_removable()
-{
-	DISKINFO=$(df | grep /mnt)
-	DISK=${DISKINFO:11:3}
-	cat /sys/block/$DISK/removable > data/disk_removable
-}
-
-check_serialno()
-{
-	remount_rw
-	if [ ! -f /mnt/$SRC/isolinux.sys ]; then
-		UUID=`cat /proc/sys/kernel/random/uuid`
-	echo ${UUID//-/} > /mnt/$SRC/isolinux.sys
-	fi
-	cat /mnt/$SRC/isolinux.sys > data/serialno
-}
-
-echo -n Detecting Android-x86...
+if [ -n "$DEBUG" ]; then
+	echo -n Detecting Android-x86...
+fi
 
 [ -z "$SRC" -a -n "$BOOT_IMAGE" ] && SRC=`dirname $BOOT_IMAGE`
 
@@ -214,12 +178,14 @@ done
 mount -t tmpfs tmpfs /android
 cd /android
 while :; do
-	for device in ${ROOT:-/dev/[hmsv][dmr][0-9a-z]*}; do
+	for device in ${ROOT:-/dev/[hmnsv][dmrv][0-9a-z]*}; do
 		check_root $device && break 2
 		mountpoint -q /mnt && umount /mnt
 	done
 	sleep 1
-	echo -n .
+	if [ -n "$DEBUG" ]; then
+		echo -n .
+	fi
 done
 
 ln -s mnt/$SRC /src
@@ -237,10 +203,11 @@ if [ -x system/bin/ln -a \( -n "$DEBUG" -o -n "$BUSYBOX" \) ]; then
 	busybox mv /sbin/* sbin
 	rmdir /sbin
 	ln -s android/bin android/lib android/sbin /
+	hash -r
 fi
 
 # ensure keyboard driver is loaded
-[ -n "$INSTALL" -o -n "$DEBUG" ] && modprobe atkbd
+[ -n "$INSTALL" -o -n "$DEBUG" ] && busybox modprobe -a atkbd hid-apple
 
 if [ 0$DEBUG -gt 0 ]; then
 	echo -e "\nType 'exit' to continue booting...\n"
@@ -257,14 +224,13 @@ done
 # return 1 if it wants to use auto_detect
 [ "$AUTO" != "1" ] && detect_hardware && FOUND=1
 
-[ -n "$INSTALL" ] && do_install
+[ "$INSTALL" -eq 1 ] && do_install
+[ "$INSTALL" -eq 2 ] && do_preinstall
 
-load_modules
 mount_data
+load_modules
 mount_sdcard
-check_disk_removable
-check_ota
-check_serialno
+init_remixos
 setup_tslib
 setup_dpi
 post_detect
@@ -281,6 +247,8 @@ fi
 # We must disable mdev before switching to Android
 # since it conflicts with Android's init
 echo > /proc/sys/kernel/hotplug
+
+export ANDROID_ROOT=/system
 
 exec ${SWITCH:-switch_root} /android /init
 
