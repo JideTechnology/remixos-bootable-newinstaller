@@ -65,7 +65,7 @@ try_mount()
 		RW="nolock,$RW"
 	fi
 	# FIXME: any way to mount ntfs gracefully?
-	mount -o $RW,noatime,nodiratime $@ || mount.ntfs-3g -o rw,force,big_writes,delay_mtime,noatime,nodiratime $@
+	mount -o $RW,noatime,nodiratime $@ || mount.ntfs-3g -o rw,force $@
 }
 
 # region @jide
