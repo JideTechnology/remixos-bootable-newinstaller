@@ -202,9 +202,11 @@ check_serialno()
 	if [ "$SERIAL" = "random" ]; then
 		if [ ! -f /mnt/$SRC/isolinux.sys ]; then
 			UUID=`cat /proc/sys/kernel/random/uuid`
-		echo ${UUID//-/} > /mnt/$SRC/isolinux.sys
+			echo ${UUID//-/} > /mnt/$SRC/isolinux.sys
+			echo ${UUID//-/} > data/serialno
+		else
+			cat /mnt/$SRC/isolinux.sys > data/serialno
 		fi
-		cat /mnt/$SRC/isolinux.sys > data/serialno
 	else
 		dmidecode -s system-serial-number > data/serialno
 	fi
