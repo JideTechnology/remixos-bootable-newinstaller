@@ -144,6 +144,9 @@ install_sys()
 	done
     fi
 
+    REMIXOS_VERSION_INC=`awk -F= '/ro.build.version.incremental/ {print $2}' /android/system/build.prop`
+    echo "ro.remixos.meta.installer=preinstall:$REMIXOS_VERSION_INC" >> remixos_meta.sys
+    echo "ro.remixos.meta.install_type=hdd" >> remixos_meta.sys
     dialog --infobox "\n Synchronizing data to disk..." 5 40
     sync
 
