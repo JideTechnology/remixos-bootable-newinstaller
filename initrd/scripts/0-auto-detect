@@ -1,6 +1,6 @@
 #
 # By Chih-Wei Huang <cwhuang@linux.org.tw>
-# Last updated 2016/03/03
+# Last updated 2016/08/14
 #
 # License: GNU Public License
 # We explicitely grant the right to use the scripts
@@ -52,7 +52,7 @@ auto_detect()
 
 load_modules()
 {
-	if [ -z "$FOUND" ]; then
+	if [ "$AUTO_LOAD" = "old" ]; then
 		auto_detect
 	fi
 
