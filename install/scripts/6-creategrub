@@ -11,3 +11,17 @@ menuentry "Remix OS" {
 }
 EOF
 }
+
+# write_grub_file $grub_menu_lst $asrc $remixos_data $remixos_sys $remixos_sys_number $diskid
+write_grub_file_legacy()
+{
+    cat <<EOF > $1
+timeout=1
+
+title Remix OS
+root (hd$6,$5)
+kernel /$2/kernel INSTALLED_CMDLINE SRC=$asrc DATA=$3 ROOT=$4
+initrd /$2/initrd.img
+
+EOF
+}

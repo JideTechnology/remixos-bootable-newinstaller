@@ -284,7 +284,7 @@ install_to()
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
 	cmdline=`sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE=\S\+\?\s*\)||; s|CREATE_DATA_IMG=1||; s|DATA_IN_MEM=1||" /proc/cmdline`
 
-	asrc=android-$VER
+	asrc=RemixOS
 	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install boot loader GRUB?" 7 47
 	if [ $? -eq 0 ]; then
@@ -319,10 +319,11 @@ install_to()
 			[ $? -eq 0 ] && mkdosfs -n EFI /dev/$boot
 		done
 		cp -af /grub2/efi /hd
-		grubcfg=/hd/efi/boot/grub.cfg
+		mkdir -p /hd/boot/grub
+		grubcfg=/hd/boot/grub/grub.cfg
 		echo -e "set timeout=6\n\n" > $grubcfg
-		echo -e "menuentry \"Remix OS $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel quiet $cmdline \n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
-		echo -e "menuentry \"Remix OS $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinuxefi /$asrc/kernel $cmdline DEBUG=2\n\tinitrdefi /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Remix OS $VER\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel quiet $cmdline \n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
+		echo -e "menuentry \"Remix OS $VER (DEBUG mode)\" {\n\tsearch --set=root --file /$asrc/kernel\n\tlinux /$asrc/kernel $cmdline DEBUG=2\n\tinitrd /$asrc/initrd.img\n}" >> $grubcfg
 		if [ -e /hd/EFI/Microsoft/Boot/bootmgfw.efi ]; then
 			echo -e "menuentry \"Windows (UEFI)\" {\n\tsearch --set=root --file /EFI/Microsoft/Boot/bootmgfw.efi\n\tchainloader /EFI/Microsoft/Boot/bootmgfw.efi\n}" >> $grubcfg
 		fi

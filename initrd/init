@@ -225,7 +225,7 @@ done
 [ "$AUTO" != "1" ] && detect_hardware && FOUND=1
 
 [ "$INSTALL" -eq 1 ] && do_install
-[ "$INSTALL" -eq 2 ] && do_preinstall
+[ "$INSTALL" = "2" -o "$INSTALL" = "PREINSTALL_MBR" -o "$INSTALL" = "PREINSTALL_EFI" ] && do_preinstall
 
 mount_data
 load_modules

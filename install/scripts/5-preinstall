@@ -12,6 +12,7 @@ get_hd()
 	fi
     done
     echo "select_hd: $select_hd"
+    select_hd_id=$(( $(LC_CTYPE=C printf '%d' "'${select_hd:2:1}'") - 97 ))
 
     if ［ -z $select_hd ］; then
 	dialog --title " Error " --msgbox "\n No hard disk is found!" 7 40
@@ -24,7 +25,7 @@ get_hd()
 mount_hd()
 {
     mountpoint -q /hd && umount /hd
-    try_mount rw /dev/$1 /hd
+    try_mount rw /dev/block/$1 /hd
     return $?
 }
 
@@ -32,6 +33,62 @@ mount_hd()
 delete_all_partitions()
 {
     dd if=/dev/zero of=/dev/${1} bs=2048 count=1 conv=notrunc
+}
+
+#example: create_mbr_partitions sda
+create_mbr_partitions()
+{
+    # default system size : 10GB
+    [ -z $REMIXOS_SYS_GB ] && REMIXOS_SYS_GB=10
+
+    # to create the partitions programatically (rather than manually)
+    # we're going to simulate the manual input to fdisk
+    # The sed script strips off all the comments so that we can
+    # document what we're doing in-line with the actual commands
+    # Note that a blank line (commented as "defualt" will send a empty
+    # line terminated with a newline to take the fdisk default.
+    sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | busybox fdisk /dev/block/${1}
+      o # clear the in memory partition table
+      n # new partition BOOT
+      p # primary partition
+      1 # partition number 1
+        # default - start at beginning of disk
+      +100M # 100 MB boot parttion
+      n # new partition SYSTEM
+      p # primary partition
+      2 # partion number 2
+        # default, start immediately after preceding partition
+      +${REMIXOS_SYS_GB}G  # SYSTEM
+      n # new partition
+      p # primary partition
+      3 # partion number 2 DATA
+        # default, start immediately after preceding partition
+        # default, extend partition to end of disk
+      a # make a partition bootable
+      1 # bootable partition is partition 1 -- /dev/sda1
+      p # print the in-memory partition table
+      w # write the partition table
+      q # and we're done
+EOF
+
+    if [ $? -ne 0 ]; then
+        install_failed=yes
+        dialog --title " Error " --msgbox "\n Couldn't create MBR partitions!" 7 33
+        return 1
+    fi
+
+    while [ ! -e /dev/${1}3 ]; do
+        sleep 1
+    done
+    mke2fs -t ext4 /dev/${1}1
+    mke2fs -t ext4 -E lazy_itable_init=0,lazy_journal_init=0 /dev/${1}2
+    mke2fs -t ext4 -E lazy_itable_init=0,lazy_journal_init=0 /dev/${1}3
+
+    remixos_boot=${1}1
+    remixos_sys=${1}2
+    remixos_data=${1}3
+
+    return 0
 }
 
 #example: create_gpr_partitions sda
@@ -78,6 +135,21 @@ EOF
     remixos_data=${1}3
 
     return 0
+}
+
+install_grub()
+{
+    mount_hd $remixos_boot
+    cp -af /grub /hd
+    rm -f /hd/boot/grub/stage1
+    menulst=/hd/grub/menu.lst
+    mkdir -p /hd/grub
+    write_grub_file_legacy $menulst $asrc /dev/$remixos_data /dev/$remixos_sys 1 $select_hd_id
+    echo "(hd$select_hd_id) /dev/$select_hd" > /hd/grub/device.map
+    echo "setup (hd$select_hd_id) (hd$select_hd_id,0)" | grub --device-map /hd/grub/device.map
+    if [ $? -ne 0 ]; then
+        echo "error"
+    fi
 }
 
 install_grub2()
@@ -154,6 +226,14 @@ install_sys()
 }
 
 #example: install_hdd
+install_mbr_hdd()
+{
+    cd /
+    asrc=RemixOS
+    install_grub && install_sys
+}
+
+#example: install_hdd
 install_gpt_hdd()
 {
     cd /
@@ -163,15 +243,26 @@ install_gpt_hdd()
 
 do_preinstall()
 {
-    echo "do_preinstall"
+    echo "do_preinstall $INSTALL"
 
     get_hd
 
     if [ -n $select_hd ]; then
-	create_gpt_partitions $select_hd && install_gpt_hdd && dialog --title " Congratulations! " --msgbox "\n Remix OS has been installed successfully. \n" 7 50
+        if [ "$INSTALL" = "PREINSTALL_MBR" ]; then
+            create_mbr_partitions $select_hd
+            install_mbr_hdd
+        else
+            create_gpt_partitions $select_hd
+            install_gpt_hdd
+        fi
+
     fi
 
-    [ $install_failed = "yes" ] && dialog --title " Error " --msgbox "\n RemixOS installation failed. \n" 7 42
+    if [ $install_failed = "yes" ]; then
+        dialog --title " Error " --msgbox "\n RemixOS installation failed. \n" 7 42
+    else
+        dialog --title " Congratulations! " --msgbox "\n Remix OS has been installed successfully. \n" 7 50
+    fi
 
     sync
     umount -a
