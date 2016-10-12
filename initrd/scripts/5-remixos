@@ -12,6 +12,87 @@ init_remixos()
     disable_console_keys_if_neccessary
 }
 
+check_ota()
+{
+    check_ota_internal 2>&1 | show_ota_dialog
+}
+
+has_ota()
+{
+    if [ -e "data/media/0/autoupdater/otapackage.zip" ]; then
+       return 0
+    fi
+    return 1
+}
+
+progress_prefix=PROGRESS_INFO
+NO_ERR=no_err
+show_progress()
+{
+    printf "$progress_prefix|$1|$2|$3\n"
+}
+
+show_ota_dialog()
+{
+    remount_rw
+    if ! has_ota; then
+        return
+    fi
+
+    export TERMINFO=/lib/terminfo
+    (
+        counter=0
+        # to be different with the counter when error occurs.
+        old_counter=-2
+        info=Initializing
+        while true; do
+            read line
+            if ( echo $line | grep -e "^$progress_prefix.*" >/dev/null ); then
+                err_code=$(echo $line | cut -d'|' -f4)
+                if ( echo $err_code | grep -e "$NO_ERR" >/dev/null ); then
+                    counter=$(echo $line | cut -d'|' -f2)
+                    info=$(echo $line | cut -d'|' -f3)
+                else
+                    counter=-1
+                    info="$(echo $line | cut -d'|' -f3) $err_info"
+                fi
+            elif ( echo $line | grep -e "^set_progress.*" >/dev/null ); then
+                num=$(echo $line | cut -d' ' -f2)
+                # here "percentage*35", the 35 is weight of this stage.
+                percentage=$(awk "BEGIN{print $num*35}")
+                if (echo $num | grep -e "[.0-9]\+" >/dev/null )
+                then
+                    percentage=$( printf "%.0f" $percentage )
+                else
+                    percentage=20
+                fi
+                # because the first patching usually is big, so add 10 to process counter.
+                new_counter=$(( 40+percentage ))
+                if [ "$new_counter" -gt "$counter" ]; then
+                    counter=$new_counter
+                fi
+                info="Update in progress..."
+            elif ( echo $line | grep -e ".*error.*" >/dev/null ); then
+                info=$line
+                counter=-1
+                err_info=$line
+            fi
+
+            if [ "$old_counter" -ne "$counter" ]; then
+                printf "XXX\n$counter\n$info\nXXX\n"
+                sleep 1
+                old_counter=$counter
+            fi
+
+            if [ $counter -eq 100 ]; then
+                sleep 2
+                exit
+            fi
+        done
+    ) |
+      dialog --title "Remix OS Updater" --gauge "Please wait" 7 70 0
+}
+
 disable_console_keys()
 {
    cat <<EOF | loadkeys -q
@@ -81,13 +162,14 @@ wipe_without_sdcard()
     cd ../..
 }
 
-check_ota()
+check_ota_internal()
 {
 	remount_rw
-	if [ -e "data/media/0/autoupdater/otapackage.zip" ]; then
+	if has_ota; then
 		LOG_FILE=/mnt/$SRC/ota_log
 		clear_log_file
-		log_string "Start updating..."
+		log_string "Update in progress"
+		show_progress 0 "Initializing" $NO_ERR
 		if [ -e "/sfs/system.img" ]; then
 			run_cmd cp /sfs/system.img /mnt/$SRC/system.img
 		fi
@@ -98,10 +180,12 @@ check_ota()
 			run_cmd ln -sf /mnt/$SRC/kernel /mnt/kernel
 			run_cmd ln -sf /mnt/$SRC/system.img /mnt/system.img
 		fi
-		mkfifo pipe
+		show_progress 20 "Update in progress." $NO_ERR
+		[ ! -p pipe ] && mkfifo pipe
 		tee -a $LOG_FILE < pipe &
-		x86update data/media/0/autoupdater/otapackage.zip > pipe 
+		x86update data/media/0/autoupdater/otapackage.zip > pipe
 		success="$?"
+		set_progress 80 "Updated the system..." $NO_ERR
 		if [ -L /mnt/ramdisk.img ]; then
 			run_cmd rm /mnt/ramdisk.img
 		fi
@@ -115,6 +199,7 @@ check_ota()
 			run_cmd rm /mnt/system.img
 		fi
 		if [ $success -eq 0 ]; then
+			show_progress 85 "Update in progress...." $NO_ERR
 			# update grub2
 			grub_script=create_grub
 			log_string "grub_script=$grub_script"
@@ -131,6 +216,7 @@ check_ota()
 				run_cmd rm -rf /efitmp
 			fi
 
+			show_progress 90 "Update in progress....." $NO_ERR
 			# remove the cached auto detect script
 			run_cmd rm data/local/cached_auto_detect.sh
 			run_cmd rm data/media/0/autoupdater/otapackage.zip
@@ -149,6 +235,8 @@ check_ota()
 					run_cmd rm -f /mnt/$SRC/system.sfs
 				fi
 			fi
+
+			show_progress 100 "Update Successfully" $NO_ERR
 			pause_for_debug
 			log_string "Preparing to restart. Please wait ..."
 			sync
@@ -157,9 +245,10 @@ check_ota()
 			sleep 2
 			sync
 			sleep 2
-			reboot -f
+			reboot -f 2>&1 >> /dev/null
 		else
 			log_string "Update failed"
+			show_progress 0 "Update failed with err_code:" $success
 			run_cmd rm data/media/0/autoupdater/otapackage.zip
 			pause_for_debug
 		fi

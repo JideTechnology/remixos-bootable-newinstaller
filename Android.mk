@@ -83,10 +83,7 @@ efi_remixos_dir := $(boot_dir)/efi/RemixOS
 efi_boot_dir := $(boot_dir)/efi/boot
 efi_grub_dir := $(boot_dir)/boot/grub
 isolinux_dir := $(boot_dir)/isolinux
-efi_ia32_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*ia32.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*32.mod)
-efi_x64_files :=$(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*x64.efi) $(wildcard $(LOCAL_PATH)/install/grub2/efi/boot/*64.mod)
-efi_x64_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub64.cfg
-efi_ia32_grub :=$(LOCAL_PATH)/install/grub2/efi/boot/grub32.cfg
+
 ifdef GRUB2_CFG
 	efi_boot_grub :=$(GRUB2_CFG)
 else
@@ -96,24 +93,16 @@ endif
 $(boot_dir): $(wildcard $(LOCAL_PATH)/boot/isolinux/* $(efi_boot_grub)) $(systemimg) $(INSTALL_RAMDISK) $(GENERIC_X86_CONFIG_MK) | $(ACP)
 	$(hide) rm -rf $@
 	$(ACP) -pr $(dir $(<D)) $@
-	$(hide) mkdir -p $(efi_remixos_dir)
 	$(hide) mkdir -p $(efi_boot_dir)
 	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_boot_grub) > $(efi_grub_dir)/grub.cfg
 ifdef ISOLINUX_CFG
-	$(hide) cp $(ISOLINUX_CFG) $(isolinux_dir)
+	$(hide) $(ACP) $(ISOLINUX_CFG) $(isolinux_dir)
 endif
-	$(hide) cp $(efi_ia32_files) $(efi_remixos_dir)
-	$(hide) cp $(efi_ia32_files) $(efi_boot_dir)
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub32.cfg
-	$(hide) cp $(efi_x64_files) $(efi_remixos_dir)
-	$(hide) cp $(efi_x64_files) $(efi_boot_dir)
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_x64_grub) > $(efi_remixos_dir)/grub64.cfg
+	$(hide) $(ACP) -pr $(dir $(<D))../install/grub2/efi/boot $(efi_remixos_dir)
+	$(hide) $(ACP) -p $(dir $(<D))../install/grub2/efi/boot/*.efi $(efi_boot_dir)
+	$(hide) sed -i "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_remixos_dir)/grub.cfg
 	@echo arch=$(TARGET_EFI_ARCH) > $(boot_dir)/info.ini
-ifeq ($(TARGET_EFI_ARCH),x86)
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_ia32_grub) > $(efi_remixos_dir)/grub.cfg
-else
-	$(hide) sed "s|VER|$(VER)|; s|CMDLINE|$(BOARD_KERNEL_CMDLINE)|" $(efi_x64_grub) > $(efi_remixos_dir)/grub.cfg
-endif
+
 
 
 BUILT_IMG_MIN := $(addprefix $(PRODUCT_OUT)/,ramdisk.img initrd.img install.img)
