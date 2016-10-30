@@ -13,6 +13,8 @@
 PATH=/sbin:/bin:/system/bin:/system/xbin; export PATH
 
 # configure debugging output
+# Lets modify this to generate log with this data regardless od DEBUG=X.
+# But with DEBUG=0/"" it shouldn't have set -x
 if [ -n "$DEBUG" ]; then
 	LOG=/tmp/log
 	set -x
@@ -209,8 +211,82 @@ fi
 # ensure keyboard driver is loaded
 [ -n "$INSTALL" -o -n "$DEBUG" ] && busybox modprobe -a atkbd hid-apple
 
+
+# Save some important, useful boot info for the Android log dumping script and more
+echo '#!/system/bin/sh' > boot_info
+echo 'DEBUG="'$DEBUG'"' >> boot_info
+echo 'SAVE_LOGS="'$SAVE_LOGS'"' >> boot_info
+echo 'DATA_IN_MEM="'$DATA_IN_MEM'"' >> boot_info
+echo 'native_partition_path="'$dev'"' >> boot_info
+echo 'native_partition_uuid="'`/system/bin/blkid -s UUID -o value $dev`'"' >> boot_info
+echo 'native_partition_remix_dir="'$SRC'"' >> boot_info
+# If booted from removable storage device
+# If any REMIX_OS labeled partition on native boot device found, then set as winfriendly partition path.
+removable_boot_win_partition_path=$(/system/bin/blkid -t LABEL="REMIX_OS" -o device ${dev%?}*)
+if [[ -n "$removable_boot_win_partition_path" ]]; then
+	echo 'removable_boot_win_partition_path="'$removable_boot_win_partition_path'"' >> boot_info
+	echo 'removable_boot_win_partition_uuid="'`/system/bin/blkid -s UUID -o value $removable_boot_win_partition_path`'"' >> boot_info
+fi
+
+# Log dumper
+# Need to decide log dumping points - when should it dump?
+dump_logs()
+{
+	if [[ -n "$DEBUG" || -n "$SAVE_LOGS" ]]; then
+		boot_step=$1
+		# Log naming
+		brand=$(dmidecode -s system-manufacturer) && brand=${brand// /-}
+		model=$(dmidecode -s system-product-name) && model=${model// /-}
+		version=$(cat /system/build.prop | grep remixos.version | cut -d= -f2-) && version=${version// /-}
+		system_arch=$(uname -a | grep -o 'x86\|x86_64' | head -1) && system_arch=${system_arch// /-}
+
+		dmesg="dmesg_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+		lspci="lspci_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+		lsusb="lsusb_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+		cpuinfo="cpuinfo_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+		dmidecode="dmidecode_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+		debuglog="debuglog_${boot_step}_${brand}_${model}_${version}_${system_arch}_$(date +%F_%H-%M).txt"
+
+		# Make sure storage writable and set logs path
+		mount -o remount,rw /mnt
+		logs_src="/mnt/$SRC/RemixOS_Logs/Automatic"
+		logs_path="$logs_src/$brand_$model/$boot_step" && mkdir -p $logs_path
+		# Delete all automatically generated logs older than 14 days, no matter the device or boot_step
+		find $logs_src -type f -mtime +14 -delete
+		# Remove all logs in folder except for 12 most recent (2 of each log type)
+		ls -dt $logs_path/* | tail -n +13 | xargs rm -rf > /dev/null
+
+		# Actual dumping
+		dmesg > $logs_path/$dmesg
+		lspci > $logs_path/$lspci
+		lsusb > $logs_path/$lsusb
+		dmidecode > $logs_path/$dmidecode
+		cat /proc/cpuinfo > $logs_path/$cpuinfo
+		cat $LOG > $logs_path/$debuglog
+
+		# COPY LOGS TO WIN FRIENDLY PARTITION IF BOOTED FROM REMOVABLE MEDIA
+		if [[ -n "$removable_boot_win_partition_path" ]]; then
+			mkdir -p /removable_boot_win_partition && mount $removable_boot_win_partition_path /removable_boot_win_partition
+			removable_logs_src="/removable_boot_win_partition/RemixOS_Logs/Automatic"
+			removable_logs_path="$removable_logs_src/$brand_$model/$boot_step" && mkdir -p $removable_logs_path
+			find $removable_logs_src -type f -mtime +14 -delete
+			ls -dt $removable_logs_path/* | tail -n +13 | xargs rm -rf > /dev/null
+			cp $logs_path/$dmesg $removable_logs_path $logs_path/$lspci $removable_logs_path $logs_path/$lsusb $removable_logs_path $logs_path/$cpuinfo $removable_logs_path $logs_path/$dmidecode $removable_logs_path $logs_path/$debuglog $removable_logs_path
+			# Unmount, because otherwise user won't be able to write to that partition once system loads.
+			umount /removable_boot_win_partition
+		fi
+		if [ 0$DEBUG -gt 0 ]; then
+			echo -e "\n\nAll logs and hardware info for booting up to this point were saved to:\n\n1. Native partition (where you installed OS) in dir:\n$SRC/RemixOS_Logs/Automatic\nFull path for DEBUG environment:\n$logs_path"
+			[ -n "$removable_boot_win_partition_path" ] && echo -e '\n2. "REMIX_OS" Windows friendly partition in dir:\nRemixOS_Logs/Automatic'
+			echo -e "\nMore logs for further boot steps will be saved after you exit this environment.\nThis logs session is retained along with 2 other recent sessions until manual or automatic removal.\nWhen logs older then 14 days are found - they are deleted."
+		fi
+	fi
+}
+
 if [ 0$DEBUG -gt 0 ]; then
-	echo -e "\nType 'exit' to continue booting...\n"
+	# Dump logs right before DEBUG terminal is accessible by user.
+	dump_logs "AT-DEBUG-CLI"
+	echo -e "\nTo scroll, use Shift + PgUp/PgDn\n\nEnter 'exit' to continue booting...\n"
 	debug_shell debug-found
 fi
 
@@ -249,6 +325,9 @@ fi
 echo > /proc/sys/kernel/hotplug
 
 export ANDROID_ROOT=/system
+
+# Dump logs right before attempting to load Android.
+dump_logs "END-OF-INIT"
 
 exec ${SWITCH:-switch_root} /android /init
 
