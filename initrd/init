@@ -249,8 +249,11 @@ dump_logs()
 
 		# Make sure storage writable and set logs path
 		mount -o remount,rw /mnt
-		logs_src="/mnt/$SRC/RemixOS_Logs/Automatic"
-		logs_path="$logs_src/$brand_$model/$boot_step" && mkdir -p $logs_path
+		for d in /mnt/$SRC /tmp; do
+			logs_src="$d/RemixOS_Logs/Automatic"
+			logs_path="$logs_src/$brand_$model/$boot_step"
+			mkdir -p $logs_path && break
+		done
 		# Delete all automatically generated logs older than 14 days, no matter the device or boot_step
 		find $logs_src -type f -mtime +14 -delete
 		# Remove all logs in folder except for 12 most recent (2 of each log type)
