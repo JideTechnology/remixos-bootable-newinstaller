@@ -239,7 +239,7 @@ create_data_img()
 try_upgrade()
 {
 	[ -d $1 ] && return
-	PREV_VERS="6.0-rc1 5.1-rc1 4.4-r5 4.4-r4 4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
+	PREV_VERS="6.0-r1 6.0-rc2 6.0-rc1 5.1-rc1 4.4-r5 4.4-r4 4.4-r3 4.4-r2 4.4-r1 4.4-RC2 4.4-RC1 4.4-test 4.3-test 4.2-test 4.0-r1 4.0-RC2 4.0-RC1"
 	for v in $PREV_VERS; do
 		prev=hd/android-$v
 		if [ -d $prev ]; then
@@ -282,10 +282,11 @@ install_to()
 	done
 
 	fs=`cat /proc/mounts | grep /dev/$1 | awk '{ print $3 }'`
-	cmdline=`sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE=\S\+\?\s*\)||; s|CREATE_DATA_IMG=1||; s|DATA_IN_MEM=1||" /proc/cmdline`
+	cmdline=`sed "s|\(initrd.*img\s*\)||; s|quiet\s*||; s|\(vga=\w\+\?\s*\)||; s|\(DPI=\w\+\?\s*\)||; s|\(INSTALL=\w\+\?\s*\)||; s|\(SRC=\S\+\?\s*\)||; s|\(DEBUG=\w\+\?\s*\)||; s|\(BOOT_IMAGE=\S\+\?\s*\)||; s|\(iso-scan/filename=\S\+\?\s*\)||; s|CREATE_DATA_IMG=1||; s|DATA_IN_MEM=1||" /proc/cmdline`
 
-	asrc=RemixOS
-	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
+	[ -n "$INSTALL_PREFIX" ] && asrc=$INSTALL_PREFIX || asrc=RemixOS
+	efi="`dmesg | grep EFI.VGA`"
+	[ -z "$efi" ] && dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install boot loader GRUB?" 7 47
 	if [ $? -eq 0 ]; then
 		cp -af /grub /hd
@@ -299,7 +300,7 @@ install_to()
 		[ $? -ne 0 ] && return 255
 	fi
 
-	dialog --title " Confirm " --no-label Skip --defaultno --yesno \
+	[ -n "$efi" ] && dialog --title " Confirm " --no-label Skip --defaultno --yesno \
 		"\n Do you want to install EFI GRUB2?" 7 39
 	if [ $? -eq 0 ]; then
 		get_part_info $1
@@ -331,7 +332,7 @@ install_to()
 		try_mount rw /dev/$1 /hd
 	fi
 
-	dialog --title " Question " --yesno \
+	dialog --title " Question " --defaultno --yesno \
 		"\nDo you want to install /system directory as read-write?\n\nMaking /system be read-write is easier for debugging, but it needs more disk space and longer installation time." 10 61
 	instal_rw=$?
 
